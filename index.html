@@ -31,7 +31,7 @@
   <div id="controls">
     <button id="startBtn" onclick="initApp()">1. ENABLE CAMERA</button>
     <button id="scanBtn" onclick="takeSnapshot()">2. SCAN MENU</button>
-    <div id="debug-info" style="font-size: 10px; color: #666;">v1.0 - No Iframe Mode</div>
+    <div id="debug-info" style="font-size: 10px; color: #666;">v1.2 - Fixed Redirect Sync</div>
   </div>
 
   <script>
@@ -46,31 +46,30 @@
     let worker = null;
 
     // --- CONFIGURATION ---
-    // PASTE YOUR GOOGLE SCRIPT URL HERE
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzcvyRggwoelmh7hrDKZnelATDneBeFlYb90JexmJ8h28OTneJasntYmhFxVWrvndgl/exec";
+    // PASTE YOUR URL BELOW
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyTiK5Wqrxu0kuDiCheXNPr0rwfIymqpJpdoFC0C6PeXCsBmftsh-6GqetRwCpc1ZqP/exec";
 
-    // 1. Load data as soon as the page opens
+
+    
+    // 1. Load data from Google Sheets immediately
     window.onload = loadSheetData;
 
-async function loadSheetData() {
-  const GAS_URL = "YOUR_NEW_EXEC_URL_HERE"; 
-  
-  try {
-    status.innerText = "Connecting to Google...";
-    const response = await fetch(GAS_URL);
-    
-    if (!response.ok) throw new Error('Network response was not ok');
-    
-    menuData = await response.json();
-    console.log("Data Loaded:", menuData);
-    status.innerText = "Menu Synced. Ready!";
-    
-  } catch (err) {
-    console.error("Fetch error:", err);
-    status.innerText = "Sync Error: " + err.message;
-    alert("Sync Error: Make sure your Google Script is deployed to 'Anyone'.");
-  }
-}
+    async function loadSheetData() {
+      try {
+        status.innerText = "Connecting to Google...";
+        const response = await fetch(GAS_URL);
+        
+        if (!response.ok) throw new Error('Could not reach Google Script');
+        
+        menuData = await response.json();
+        console.log("Data Loaded:", menuData);
+        status.innerText = "Menu Synced. Ready!";
+      } catch (err) {
+        console.error("Fetch error:", err);
+        status.innerText = "Sync Error: " + err.message;
+        alert("Sync Failed: Ensure you deployed your script to 'Anyone' and use the /exec URL.");
+      }
+    }
 
     // 2. Initialize Camera & OCR on User Tap
     async function initApp() {
@@ -124,12 +123,15 @@ async function loadSheetData() {
 
     function processResults(lines) {
       let matches = 0;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // redraw clear image
+      // redraw clear image onto canvas
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); 
 
       lines.forEach(line => {
         const text = line.text.toLowerCase().trim();
         
+        // Loop through Google Sheet items
         Object.keys(menuData).forEach(item => {
+          // If the item name (e.g. "burger") is found in the line of text
           if (text.includes(item) && item.length > 2) {
             drawBox(line.bbox, item, menuData[item]);
             matches++;
@@ -137,18 +139,27 @@ async function loadSheetData() {
         });
       });
 
-      status.innerText = matches > 0 ? `Found ${matches} items!` : "No items found. Try again.";
-      setTimeout(resetUI, 4000); // Reset after 4 seconds
+      status.innerText = matches > 0 ? `Found ${matches} matches!` : "No items found. Try again.";
+      scanBtn.disabled = false;
+      
+      // Wait 5 seconds before clearing the highlights
+      setTimeout(() => {
+        if (!scanBtn.disabled) resetUI();
+      }, 5000);
     }
 
     function drawBox(bbox, name, info) {
+      // Draw green bounding box
       ctx.strokeStyle = "#34C759";
       ctx.lineWidth = 10;
       ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
 
+      // Draw text label
       ctx.fillStyle = "#34C759";
-      ctx.font = "bold 34px Arial";
-      ctx.fillText(name.toUpperCase() + ": " + info, bbox.x0, bbox.y0 - 20);
+      ctx.font = "bold 36px Arial";
+      // Redraw name and the sheet info
+      const label = name.toUpperCase() + ": " + info;
+      ctx.fillText(label, bbox.x0, bbox.y0 - 20);
     }
 
     function resetUI() {
