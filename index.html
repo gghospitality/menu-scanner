@@ -3,38 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Menu Scanner v2.0</title>
+  <title>Menu Scanner Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     
-    /* 1. Video Container */
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     
-    /* 2. Floating Debug Box (Pinned to top of video) */
-    #debugText { position: absolute; top: 110px; left: 5%; width: 90%; background: rgba(255,0,0,0.7); color: white; padding: 10px; border-radius: 10px; font-size: 11px; z-index: 500; font-family: monospace; max-height: 80px; overflow-y: auto; }
+    /* Clean Status Bubble */
+    #status { position: fixed; top: 50px; width: 80%; left: 10%; background: rgba(0,0,0,0.85); color: white; padding: 12px; border-radius: 25px; text-align: center; z-index: 1000; font-size: 14px; border: 1px solid #34C759; font-weight: bold; }
 
-    /* 3. Status Bubble */
-    #status { position: fixed; top: 40px; width: 86%; left: 7%; background: rgba(0,0,0,0.9); color: white; padding: 15px; border-radius: 30px; text-align: center; z-index: 1000; font-size: 14px; border: 1px solid #34C759; }
-
-    /* 4. Controls (LIFTED for Safari) */
-    #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 110px; z-index: 1000; }
-    button { padding: 18px 40px; font-size: 20px; border-radius: 35px; border: none; font-weight: bold; width: 85%; }
+    /* Buttons lifted for Safari UI */
+    #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; z-index: 1000; }
+    button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 80%; transition: 0.2s; }
     #startBtn { background: #007AFF; color: white; }
     #scanBtn { background: #34C759; color: white; display: none; }
     
-    .spinner { border: 3px solid #333; border-top: 3px solid #34C759; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+    .spinner { border: 3px solid #333; border-top: 3px solid #34C759; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-  <div id="status">Syncing Sheets...</div>
+  <div id="status">Syncing Menu...</div>
   
   <div id="container">
-    <div id="debugText">AI raw logs will appear here after scan...</div>
     <video id="video" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
   </div>
@@ -49,7 +44,6 @@
     const canvas = document.getElementById('overlay');
     const ctx = canvas.getContext('2d');
     const status = document.getElementById('status');
-    const debugText = document.getElementById('debugText');
     const startBtn = document.getElementById('startBtn');
     const scanBtn = document.getElementById('scanBtn');
     
@@ -58,16 +52,16 @@
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzcvyRggwoelmh7hrDKZnelATDneBeFlYb90JexmJ8h28OTneJasntYmhFxVWrvndgl/exec";
 
-    // Standard cleaner for text
+    // Standard cleaner for matching
     function clean(str) {
-      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
     }
 
     window.onload = async () => {
       try {
         const response = await fetch(GAS_URL);
         menuData = await response.json();
-        status.innerText = "Menu Synced. Tap Start.";
+        status.innerText = "Menu Synced. Ready.";
       } catch (e) { status.innerText = "Sync Error."; }
     };
 
@@ -75,24 +69,22 @@
       status.innerHTML = '<div class="spinner"></div> Opening Camera...';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: "environment", width: { ideal: 1280 } }, 
+          video: { facingMode: "environment", width: { ideal: 1920 } }, 
           audio: false 
         });
         video.srcObject = stream;
         startBtn.style.display = "none";
         scanBtn.style.display = "block";
-        status.innerText = "Loading AI Engine...";
+        status.innerText = "Starting AI Engine...";
         
-        worker = await Tesseract.createWorker('eng', 1, {
-          logger: m => { if(m.status === 'recognizing') status.innerText = `Analyzing: ${Math.round(m.progress * 100)}%`; }
-        });
-        status.innerText = "Ready to Scan!";
+        worker = await Tesseract.createWorker('eng');
+        status.innerText = "Point at Menu and Scan";
       } catch (err) { alert("Camera Error: " + err.message); }
     }
 
     async function takeSnapshot() {
       if (!worker) return;
-      debugText.innerText = "Capturing frame...";
+      status.innerHTML = '<div class="spinner"></div> Analyzing...';
       scanBtn.disabled = true;
 
       canvas.width = video.videoWidth;
@@ -104,53 +96,60 @@
 
       try {
         const result = await worker.recognize(canvas);
-        debugText.innerText = "AI SEES: " + result.data.text.substring(0, 200);
-        
-        // WORD-BY-WORD MATCHING LOGIC
-        processWords(result.data.words);
+        processLines(result.data.lines);
       } catch (err) {
-        debugText.innerText = "ERROR: " + err.message;
+        status.innerText = "Scan Failed.";
         resetUI();
       }
     }
 
-    function processWords(words) {
+    function processLines(lines) {
       let matches = 0;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); 
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Refresh base image
 
-      words.forEach(word => {
-        const cleanScannedWord = clean(word.text);
-        if (cleanScannedWord.length < 3) return; // Skip tiny words like "a", "of", "19"
+      lines.forEach(line => {
+        const cleanScannedLine = clean(line.text);
+        if (cleanScannedLine.length < 4) return;
 
         Object.keys(menuData).forEach(sheetItem => {
           const cleanItemName = clean(sheetItem);
           
-          // If the word AI found is inside one of our Menu Item names
-          if (cleanItemName.includes(cleanScannedWord)) {
-            drawOverlay(word.bbox, sheetItem, menuData[sheetItem]);
+          // PHRASE MATCHING:
+          // Check if the item from your sheet is found within the scanned line
+          // (e.g. if the line is "Salade de Betteraves 19", it matches "Salade de Betteraves")
+          if (cleanScannedLine.includes(cleanItemName) && cleanItemName.length > 3) {
+            drawOverlay(line.bbox, sheetItem, menuData[sheetItem]);
             matches++;
           }
         });
       });
 
-      status.innerText = matches > 0 ? `Found ${matches} items!` : "No match. Get closer.";
+      status.innerText = matches > 0 ? `Found ${matches} items!` : "No match. Try again.";
       scanBtn.disabled = false;
       setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 8000);
     }
 
     function drawOverlay(bbox, name, info) {
-      ctx.strokeStyle = "#34C759";
-      ctx.lineWidth = 8;
-      ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.font = "bold 30px Arial";
+      // 1. Draw pill-shaped background
       const label = name.toUpperCase() + ": " + info;
-      const w = ctx.measureText(label).width;
-      ctx.fillRect(bbox.x0, bbox.y0 - 40, w + 20, 40);
-      
-      ctx.fillStyle = "#34C759";
-      ctx.fillText(label, bbox.x0 + 10, bbox.y0 - 10);
+      ctx.font = "bold 34px Arial";
+      const textWidth = ctx.measureText(label).width;
+      const padding = 20;
+
+      ctx.fillStyle = "rgba(0,0,0,0.85)";
+      // Draw label box slightly above the line
+      ctx.beginPath();
+      ctx.roundRect(bbox.x0, bbox.y0 - 60, textWidth + (padding * 2), 50, 10);
+      ctx.fill();
+
+      // 2. Draw Text
+      ctx.fillStyle = "#34C759"; // iOS Green
+      ctx.fillText(label, bbox.x0 + padding, bbox.y0 - 23);
+
+      // 3. Draw underlining box
+      ctx.strokeStyle = "#34C759";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
     }
 
     function resetUI() {
