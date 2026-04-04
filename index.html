@@ -52,20 +52,111 @@
     // 1. Load data as soon as the page opens
     window.onload = loadSheetData;
 
-    async function loadSheetData() {
-      try {
-        const response = await fetch(GAS_URL);
-        menuData = await response.json();
-        status.innerText = "Menu Synced. Ready to Start.";
-      } catch (err) {
-        status.innerText = "Sync Error. Check your GAS URL.";
-        console.error(err);
-      }
-    }
+async function loadSheetData() {
+  const GAS_URL = "YOUR_NEW_EXEC_URL_HERE"; 
+  
+  try {
+    status.innerText = "Connecting to Google...";
+    const response = await fetch(GAS_URL);
+    
+    if (!response.ok) throw new Error('Network response was not ok');
+    
+    menuData = await response.json();
+    console.log("Data Loaded:", menuData);
+    status.innerText = "Menu Synced. Ready!";
+    
+  } catch (err) {
+    console.error("Fetch error:", err);
+    status.innerText = "Sync Error: " + err.message;
+    alert("Sync Error: Make sure your Google Script is deployed to 'Anyone'.");
+  }
+}
 
     // 2. Initialize Camera & OCR on User Tap
     async function initApp() {
       status.innerHTML = '<div class="loading-spinner"></div> Starting Camera...';
       
       const constraints = { 
-        vid
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, 
+        audio: false 
+      };
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        
+        startBtn.style.display = "none";
+        scanBtn.style.display = "block";
+        status.innerText = "Initializing AI Engine...";
+
+        // Start Tesseract AI
+        worker = await Tesseract.createWorker('eng');
+        status.innerText = "Ready! Point and Scan.";
+      } catch (err) {
+        alert("Camera Error: " + err.message);
+        status.innerText = "Access Denied.";
+      }
+    }
+
+    // 3. Capture and Process
+    async function takeSnapshot() {
+      if (!worker) return;
+      
+      status.innerHTML = '<div class="loading-spinner"></div> Scanning Items...';
+      scanBtn.disabled = true;
+
+      // Match canvas to camera resolution
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Freeze the frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      video.style.opacity = "0.2"; 
+
+      try {
+        const { data } = await worker.recognize(canvas);
+        processResults(data.lines);
+      } catch (err) {
+        status.innerText = "Scan Failed.";
+        resetUI();
+      }
+    }
+
+    function processResults(lines) {
+      let matches = 0;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // redraw clear image
+
+      lines.forEach(line => {
+        const text = line.text.toLowerCase().trim();
+        
+        Object.keys(menuData).forEach(item => {
+          if (text.includes(item) && item.length > 2) {
+            drawBox(line.bbox, item, menuData[item]);
+            matches++;
+          }
+        });
+      });
+
+      status.innerText = matches > 0 ? `Found ${matches} items!` : "No items found. Try again.";
+      setTimeout(resetUI, 4000); // Reset after 4 seconds
+    }
+
+    function drawBox(bbox, name, info) {
+      ctx.strokeStyle = "#34C759";
+      ctx.lineWidth = 10;
+      ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+
+      ctx.fillStyle = "#34C759";
+      ctx.font = "bold 34px Arial";
+      ctx.fillText(name.toUpperCase() + ": " + info, bbox.x0, bbox.y0 - 20);
+    }
+
+    function resetUI() {
+      video.style.opacity = "1";
+      scanBtn.disabled = false;
+      status.innerText = "Ready for next scan";
+      ctx.clearRect(0,0, canvas.width, canvas.height);
+    }
+  </script>
+</body>
+</html>
