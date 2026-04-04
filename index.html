@@ -4,58 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Menu AI Scanner</title>
-  <!-- Load Tesseract AI Engine -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; color: white; overflow: hidden; }
-    
-    /* 1. Camera & Overlay Area */
     #container { position: relative; flex-grow: 1; display: flex; align-items: center; justify-content: center; background: #111; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-    
-    /* 2. Lifted UI Controls (Avoids Safari Bottom Bar) */
-    #controls { 
-      min-height: 160px; 
-      background: #1a1a1a; 
-      display: flex; 
-      flex-direction: column; 
-      justify-content: center; 
-      align-items: center; 
-      gap: 15px; 
-      padding-bottom: 120px; /* This lifts the buttons ~120px up from the bottom */
-      border-top: 1px solid #333;
-      z-index: 200;
-    }
-    
+    #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; padding-bottom: 120px; border-top: 1px solid #333; z-index: 200; }
     button { padding: 18px 40px; font-size: 20px; border-radius: 35px; border: none; font-weight: bold; width: 85%; transition: 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-    #startBtn { background: #007AFF; color: white; } /* Blue iOS Style */
-    #scanBtn { background: #34C759; color: white; display: none; } /* Green iOS Style */
-    
-    /* Status Bubble */
+    #startBtn { background: #007AFF; color: white; }
+    #scanBtn { background: #34C759; color: white; display: none; }
     #status { position: fixed; top: 60px; width: 85%; left: 7.5%; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 30px; text-align: center; z-index: 100; font-size: 15px; border: 1px solid #444; }
-    
-    /* Spinner for loading states */
     .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #34C759; border-radius: 50%; width: 22px; height: 22px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-  <!-- Top Status Message -->
   <div id="status">Syncing with Google Sheets...</div>
 
-  <!-- Main Viewport -->
   <div id="container">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
   </div>
 
-  <!-- Bottom Buttons Area -->
   <div id="controls">
     <button id="startBtn" onclick="initApp()">1. ENABLE CAMERA</button>
     <button id="scanBtn" onclick="takeSnapshot()">2. SCAN MENU</button>
-    <div id="debug-info" style="font-size: 10px; color: #666; margin-top: 5px;">v1.3 - Lifted UI & Phrase Match</div>
+    <div id="debug-info" style="font-size: 10px; color: #666; margin-top: 5px;">v1.4 - Accent Normalization Mode</div>
   </div>
 
   <script>
@@ -66,29 +42,43 @@
     const startBtn = document.getElementById('startBtn');
     const scanBtn = document.getElementById('scanBtn');
     
-    let menuData = {};
+    let menuData = {}; // Original data from Sheet
+    let normalizedMenuData = {}; // Data cleaned for matching
     let worker = null;
 
-    // --- YOUR GOOGLE SCRIPT URL ---
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzcvyRggwoelmh7hrDKZnelATDneBeFlYb90JexmJ8h28OTneJasntYmhFxVWrvndgl/exec";
 
-    // A. Sync Data on Page Load
+    // Utility: Remove accents/diacritics (e.g. ê -> e)
+    function cleanText(str) {
+      return str.normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .trim();
+    }
+
     window.onload = loadSheetData;
 
     async function loadSheetData() {
       try {
         status.innerText = "Connecting to Google...";
         const response = await fetch(GAS_URL);
-        if (!response.ok) throw new Error('Network Error');
-        menuData = await response.json();
+        const data = await response.json();
+        
+        menuData = data;
+        // Create a version of your sheet data with no accents for easy matching
+        for (let key in data) {
+          normalizedMenuData[cleanText(key)] = {
+            originalName: key,
+            info: data[key]
+          };
+        }
+        
         status.innerText = "Menu Synced. Ready!";
       } catch (err) {
-        status.innerText = "Sync Error. Refresh page.";
-        console.error(err);
+        status.innerText = "Sync Error. Check GAS URL.";
       }
     }
 
-    // B. Start Camera & AI on Tap
     async function initApp() {
       status.innerHTML = '<div class="loading-spinner"></div> Opening Camera...';
       try {
@@ -97,93 +87,73 @@
           audio: false 
         });
         video.srcObject = stream;
-        
         startBtn.style.display = "none";
         scanBtn.style.display = "block";
-        status.innerText = "Waking up AI engine...";
-
-        // Initialize Tesseract
+        status.innerText = "Starting AI...";
         worker = await Tesseract.createWorker('eng');
-        status.innerText = "Ready! Point at Menu and Scan.";
+        status.innerText = "Ready to Scan";
       } catch (err) {
-        alert("Camera Access Error: Please ensure you are in Safari and click Allow.");
-        status.innerText = "Camera Blocked.";
+        alert("Camera Error: " + err.message);
       }
     }
 
-    // C. Capture Photo & Search for Sheet Words
     async function takeSnapshot() {
       if (!worker) return;
-      
       status.innerHTML = '<div class="loading-spinner"></div> Analyzing...';
       scanBtn.disabled = true;
 
-      // Match canvas to camera resolution
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
-      // Freeze the photo on the canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      video.style.opacity = "0.3"; // Dim the background
+      video.style.opacity = "0.3"; 
 
       try {
         const { data } = await worker.recognize(canvas);
         processResults(data.lines);
       } catch (err) {
-        status.innerText = "Scan Failed. Try again.";
+        status.innerText = "Scan Failed.";
         resetUI();
       }
     }
 
-    // D. The Word-Matching Engine
     function processResults(lines) {
       let matches = 0;
-      // Redraw the original photo so the overlays are clean
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height); 
 
       lines.forEach(line => {
-        // 'text' is what the AI read on the menu
-        const textFoundOnMenu = line.text.toLowerCase().trim();
+        // Clean the line read by AI (remove its accents)
+        const textFoundOnMenu = cleanText(line.text);
         
-        // Loop through the "Burger", "Pizza", etc. from your Google Sheet
-        Object.keys(menuData).forEach(itemInSheet => {
-          
-          // Logic: If the word from our sheet exists in the line read from the menu
-          if (textFoundOnMenu.includes(itemInSheet) && itemInSheet.length > 2) {
-            // Draw a green box and the label from Column B
-            drawOverlay(line.bbox, itemInSheet, menuData[itemInSheet]);
+        // Loop through our cleaned sheet data
+        for (let cleanKey in normalizedMenuData) {
+          // Check if the cleaned menu text contains our cleaned sheet item
+          if (textFoundOnMenu.includes(cleanKey) && cleanKey.length > 3) {
+            const match = normalizedMenuData[cleanKey];
+            drawOverlay(line.bbox, match.originalName, match.info);
             matches++;
           }
-        });
+        }
       });
 
-      status.innerText = matches > 0 ? `Matched ${matches} items!` : "No matches found. Try moving closer.";
+      status.innerText = matches > 0 ? `Found ${matches} matches!` : "No matches. Try closer.";
       scanBtn.disabled = false;
-      
-      // Automatically clear the screen after 7 seconds
-      setTimeout(() => {
-        if (!scanBtn.disabled) resetUI();
-      }, 7000);
+      setTimeout(() => { if (!scanBtn.disabled) resetUI(); }, 8000);
     }
 
-    // E. Draw Visual Highlights
     function drawOverlay(bbox, name, info) {
-      // 1. Draw Green Box
       ctx.strokeStyle = "#34C759";
-      ctx.lineWidth = 12;
+      ctx.lineWidth = 10;
       ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
 
-      // 2. Draw Black Label Background
       const label = name.toUpperCase() + ": " + info;
-      ctx.font = "bold 44px Arial";
+      ctx.font = "bold 40px Arial";
       const textWidth = ctx.measureText(label).width;
       
       ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.fillRect(bbox.x0, bbox.y0 - 65, textWidth + 30, 65);
+      ctx.fillRect(bbox.x0, bbox.y0 - 60, textWidth + 30, 60);
 
-      // 3. Draw Green Text
       ctx.fillStyle = "#34C759";
-      ctx.fillText(label, bbox.x0 + 15, bbox.y0 - 18);
+      ctx.fillText(label, bbox.x0 + 15, bbox.y0 - 15);
     }
 
     function resetUI() {
