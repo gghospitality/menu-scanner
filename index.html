@@ -41,3 +41,157 @@
   </style>
 </head>
 <body>
+
+  <!-- Top Status Message -->
+  <div id="status">Syncing with Google Sheets...</div>
+
+  <!-- Main Viewport -->
+  <div id="container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <!-- Bottom Buttons Area -->
+  <div id="controls">
+    <button id="startBtn" onclick="initApp()">1. ENABLE CAMERA</button>
+    <button id="scanBtn" onclick="takeSnapshot()">2. SCAN MENU</button>
+    <div id="debug-info" style="font-size: 10px; color: #666; margin-top: 5px;">v1.3 - Lifted UI & Phrase Match</div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('overlay');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const scanBtn = document.getElementById('scanBtn');
+    
+    let menuData = {};
+    let worker = null;
+
+    // --- YOUR GOOGLE SCRIPT URL ---
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzcvyRggwoelmh7hrDKZnelATDneBeFlYb90JexmJ8h28OTneJasntYmhFxVWrvndgl/exec";
+
+    // A. Sync Data on Page Load
+    window.onload = loadSheetData;
+
+    async function loadSheetData() {
+      try {
+        status.innerText = "Connecting to Google...";
+        const response = await fetch(GAS_URL);
+        if (!response.ok) throw new Error('Network Error');
+        menuData = await response.json();
+        status.innerText = "Menu Synced. Ready!";
+      } catch (err) {
+        status.innerText = "Sync Error. Refresh page.";
+        console.error(err);
+      }
+    }
+
+    // B. Start Camera & AI on Tap
+    async function initApp() {
+      status.innerHTML = '<div class="loading-spinner"></div> Opening Camera...';
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } }, 
+          audio: false 
+        });
+        video.srcObject = stream;
+        
+        startBtn.style.display = "none";
+        scanBtn.style.display = "block";
+        status.innerText = "Waking up AI engine...";
+
+        // Initialize Tesseract
+        worker = await Tesseract.createWorker('eng');
+        status.innerText = "Ready! Point at Menu and Scan.";
+      } catch (err) {
+        alert("Camera Access Error: Please ensure you are in Safari and click Allow.");
+        status.innerText = "Camera Blocked.";
+      }
+    }
+
+    // C. Capture Photo & Search for Sheet Words
+    async function takeSnapshot() {
+      if (!worker) return;
+      
+      status.innerHTML = '<div class="loading-spinner"></div> Analyzing...';
+      scanBtn.disabled = true;
+
+      // Match canvas to camera resolution
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Freeze the photo on the canvas
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      video.style.opacity = "0.3"; // Dim the background
+
+      try {
+        const { data } = await worker.recognize(canvas);
+        processResults(data.lines);
+      } catch (err) {
+        status.innerText = "Scan Failed. Try again.";
+        resetUI();
+      }
+    }
+
+    // D. The Word-Matching Engine
+    function processResults(lines) {
+      let matches = 0;
+      // Redraw the original photo so the overlays are clean
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); 
+
+      lines.forEach(line => {
+        // 'text' is what the AI read on the menu
+        const textFoundOnMenu = line.text.toLowerCase().trim();
+        
+        // Loop through the "Burger", "Pizza", etc. from your Google Sheet
+        Object.keys(menuData).forEach(itemInSheet => {
+          
+          // Logic: If the word from our sheet exists in the line read from the menu
+          if (textFoundOnMenu.includes(itemInSheet) && itemInSheet.length > 2) {
+            // Draw a green box and the label from Column B
+            drawOverlay(line.bbox, itemInSheet, menuData[itemInSheet]);
+            matches++;
+          }
+        });
+      });
+
+      status.innerText = matches > 0 ? `Matched ${matches} items!` : "No matches found. Try moving closer.";
+      scanBtn.disabled = false;
+      
+      // Automatically clear the screen after 7 seconds
+      setTimeout(() => {
+        if (!scanBtn.disabled) resetUI();
+      }, 7000);
+    }
+
+    // E. Draw Visual Highlights
+    function drawOverlay(bbox, name, info) {
+      // 1. Draw Green Box
+      ctx.strokeStyle = "#34C759";
+      ctx.lineWidth = 12;
+      ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+
+      // 2. Draw Black Label Background
+      const label = name.toUpperCase() + ": " + info;
+      ctx.font = "bold 44px Arial";
+      const textWidth = ctx.measureText(label).width;
+      
+      ctx.fillStyle = "rgba(0,0,0,0.8)";
+      ctx.fillRect(bbox.x0, bbox.y0 - 65, textWidth + 30, 65);
+
+      // 3. Draw Green Text
+      ctx.fillStyle = "#34C759";
+      ctx.fillText(label, bbox.x0 + 15, bbox.y0 - 18);
+    }
+
+    function resetUI() {
+      video.style.opacity = "1";
+      scanBtn.disabled = false;
+      status.innerText = "Ready to Scan";
+      ctx.clearRect(0,0, canvas.width, canvas.height);
+    }
+  </script>
+</body>
+</html>
