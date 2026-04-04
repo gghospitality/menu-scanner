@@ -7,20 +7,14 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-    
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-    
-    /* Clean Status Bubble */
     #status { position: fixed; top: 50px; width: 80%; left: 10%; background: rgba(0,0,0,0.85); color: white; padding: 12px; border-radius: 25px; text-align: center; z-index: 1000; font-size: 14px; border: 1px solid #34C759; font-weight: bold; }
-
-    /* Buttons lifted for Safari UI */
     #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; z-index: 1000; }
     button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 80%; transition: 0.2s; }
     #startBtn { background: #007AFF; color: white; }
     #scanBtn { background: #34C759; color: white; display: none; }
-    
     .spinner { border: 3px solid #333; border-top: 3px solid #34C759; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
@@ -52,7 +46,6 @@
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzcvyRggwoelmh7hrDKZnelATDneBeFlYb90JexmJ8h28OTneJasntYmhFxVWrvndgl/exec";
 
-    // Standard cleaner for matching
     function clean(str) {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
     }
@@ -76,7 +69,6 @@
         startBtn.style.display = "none";
         scanBtn.style.display = "block";
         status.innerText = "Starting AI Engine...";
-        
         worker = await Tesseract.createWorker('eng');
         status.innerText = "Point at Menu and Scan";
       } catch (err) { alert("Camera Error: " + err.message); }
@@ -86,26 +78,20 @@
       if (!worker) return;
       status.innerHTML = '<div class="spinner"></div> Analyzing...';
       scanBtn.disabled = true;
-
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
-      // Freeze frame
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       video.style.opacity = "0.3"; 
 
       try {
         const result = await worker.recognize(canvas);
         processLines(result.data.lines);
-      } catch (err) {
-        status.innerText = "Scan Failed.";
-        resetUI();
-      }
+      } catch (err) { status.innerText = "Scan Failed."; resetUI(); }
     }
 
     function processLines(lines) {
       let matches = 0;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Refresh base image
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); 
 
       lines.forEach(line => {
         const cleanScannedLine = clean(line.text);
@@ -113,11 +99,8 @@
 
         Object.keys(menuData).forEach(sheetItem => {
           const cleanItemName = clean(sheetItem);
-          
-          // PHRASE MATCHING:
-          // Check if the item from your sheet is found within the scanned line
-          // (e.g. if the line is "Salade de Betteraves 19", it matches "Salade de Betteraves")
           if (cleanScannedLine.includes(cleanItemName) && cleanItemName.length > 3) {
+            // menuData[sheetItem] is now an ARRAY of descriptions
             drawOverlay(line.bbox, sheetItem, menuData[sheetItem]);
             matches++;
           }
@@ -126,29 +109,48 @@
 
       status.innerText = matches > 0 ? `Found ${matches} items!` : "No match. Try again.";
       scanBtn.disabled = false;
-      setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 8000);
+      setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 10000);
     }
 
-    function drawOverlay(bbox, name, info) {
-      // 1. Draw pill-shaped background
-      const label = name.toUpperCase() + ": " + info;
-      ctx.font = "bold 34px Arial";
-      const textWidth = ctx.measureText(label).width;
-      const padding = 20;
+    function drawOverlay(bbox, name, infoList) {
+      // SETTINGS
+      const fontSize = 18; // Half-size text
+      const padding = 10;
+      const lineHeight = fontSize + 8;
+      
+      ctx.font = `bold ${fontSize}px Arial`;
+      
+      // Calculate max width and total height
+      const title = name.toUpperCase();
+      let maxWidth = ctx.measureText(title).width;
+      infoList.forEach(text => {
+        const w = ctx.measureText("- " + text).width;
+        if (w > maxWidth) maxWidth = w;
+      });
 
+      const totalBoxHeight = (lineHeight * (infoList.length + 1)) + (padding * 2);
+
+      // 1. Draw pill-shaped background
       ctx.fillStyle = "rgba(0,0,0,0.85)";
-      // Draw label box slightly above the line
       ctx.beginPath();
-      ctx.roundRect(bbox.x0, bbox.y0 - 60, textWidth + (padding * 2), 50, 10);
+      ctx.roundRect(bbox.x0, bbox.y0 - totalBoxHeight - 10, maxWidth + (padding * 2), totalBoxHeight, 10);
       ctx.fill();
 
-      // 2. Draw Text
-      ctx.fillStyle = "#34C759"; // iOS Green
-      ctx.fillText(label, bbox.x0 + padding, bbox.y0 - 23);
+      // 2. Draw Item Title (Green)
+      ctx.fillStyle = "#34C759";
+      ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalBoxHeight + padding + fontSize);
 
-      // 3. Draw underlining box
+      // 3. Draw All Descriptions Stacked (White)
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `${fontSize - 2}px Arial`; // Slightly smaller for desc
+      infoList.forEach((desc, index) => {
+        const yOffset = bbox.y0 - totalBoxHeight + padding + fontSize + (lineHeight * (index + 1));
+        ctx.fillText("• " + desc, bbox.x0 + padding, yOffset);
+      });
+
+      // 4. Draw underlining box on the menu
       ctx.strokeStyle = "#34C759";
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3;
       ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
     }
 
