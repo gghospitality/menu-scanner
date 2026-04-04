@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Menu AI Scanner</title>
+  <title>Menu AI Scanner Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; color: white; overflow: hidden; }
     #container { position: relative; flex-grow: 1; display: flex; align-items: center; justify-content: center; background: #111; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-    #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; padding-bottom: 120px; border-top: 1px solid #333; z-index: 200; }
-    button { padding: 18px 40px; font-size: 20px; border-radius: 35px; border: none; font-weight: bold; width: 85%; transition: 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding-bottom: 100px; border-top: 1px solid #333; z-index: 200; }
+    button { padding: 18px 40px; font-size: 20px; border-radius: 35px; border: none; font-weight: bold; width: 85%; transition: 0.2s; }
     #startBtn { background: #007AFF; color: white; }
     #scanBtn { background: #34C759; color: white; display: none; }
-    #status { position: fixed; top: 60px; width: 85%; left: 7.5%; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 30px; text-align: center; z-index: 100; font-size: 15px; border: 1px solid #444; }
+    #status { position: fixed; top: 50px; width: 85%; left: 7.5%; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 30px; text-align: center; z-index: 100; font-size: 14px; border: 1px solid #444; }
+    /* DEBUG BOX: Shows you what the AI is actually seeing */
+    #debugText { width: 100%; height: 50px; font-family: monospace; font-size: 10px; color: #aaa; background: #000; overflow-y: auto; padding: 5px; box-sizing: border-box; }
     .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #34C759; border-radius: 50%; width: 22px; height: 22px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
@@ -28,10 +30,11 @@
     <canvas id="overlay"></canvas>
   </div>
 
+  <div id="debugText">AI raw text will appear here...</div>
+
   <div id="controls">
     <button id="startBtn" onclick="initApp()">1. ENABLE CAMERA</button>
     <button id="scanBtn" onclick="takeSnapshot()">2. SCAN MENU</button>
-    <div id="debug-info" style="font-size: 10px; color: #666; margin-top: 5px;">v1.4 - Accent Normalization Mode</div>
   </div>
 
   <script>
@@ -39,48 +42,34 @@
     const canvas = document.getElementById('overlay');
     const ctx = canvas.getContext('2d');
     const status = document.getElementById('status');
+    const debugText = document.getElementById('debugText');
     const startBtn = document.getElementById('startBtn');
     const scanBtn = document.getElementById('scanBtn');
     
-    let menuData = {}; // Original data from Sheet
-    let normalizedMenuData = {}; // Data cleaned for matching
+    let menuData = {};
     let worker = null;
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzcvyRggwoelmh7hrDKZnelATDneBeFlYb90JexmJ8h28OTneJasntYmhFxVWrvndgl/exec";
 
-    // Utility: Remove accents/diacritics (e.g. ê -> e)
-    function cleanText(str) {
-      return str.normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .toLowerCase()
-                .trim();
+    // Normalize text: lowercase and remove accents
+    function normalize(str) {
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     }
 
     window.onload = loadSheetData;
 
     async function loadSheetData() {
       try {
-        status.innerText = "Connecting to Google...";
         const response = await fetch(GAS_URL);
-        const data = await response.json();
-        
-        menuData = data;
-        // Create a version of your sheet data with no accents for easy matching
-        for (let key in data) {
-          normalizedMenuData[cleanText(key)] = {
-            originalName: key,
-            info: data[key]
-          };
-        }
-        
+        menuData = await response.json();
         status.innerText = "Menu Synced. Ready!";
       } catch (err) {
-        status.innerText = "Sync Error. Check GAS URL.";
+        status.innerText = "Sync Error.";
       }
     }
 
     async function initApp() {
-      status.innerHTML = '<div class="loading-spinner"></div> Opening Camera...';
+      status.innerHTML = '<div class="loading-spinner"></div> Loading Camera...';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } }, 
@@ -89,9 +78,9 @@
         video.srcObject = stream;
         startBtn.style.display = "none";
         scanBtn.style.display = "block";
-        status.innerText = "Starting AI...";
+        status.innerText = "Initializing AI...";
         worker = await Tesseract.createWorker('eng');
-        status.innerText = "Ready to Scan";
+        status.innerText = "Ready to Scan!";
       } catch (err) {
         alert("Camera Error: " + err.message);
       }
@@ -100,15 +89,22 @@
     async function takeSnapshot() {
       if (!worker) return;
       status.innerHTML = '<div class="loading-spinner"></div> Analyzing...';
+      debugText.innerText = "AI Processing...";
       scanBtn.disabled = true;
 
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      
+      // PRE-PROCESSING: Slightly boost contrast/brightness to help Tesseract
+      ctx.filter = "brightness(1.1) contrast(1.2)";
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.filter = "none";
+      
       video.style.opacity = "0.3"; 
 
       try {
         const { data } = await worker.recognize(canvas);
+        debugText.innerText = "AI SEES: " + data.text.replace(/\n/g, ' | ');
         processResults(data.lines);
       } catch (err) {
         status.innerText = "Scan Failed.";
@@ -121,39 +117,41 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height); 
 
       lines.forEach(line => {
-        // Clean the line read by AI (remove its accents)
-        const textFoundOnMenu = cleanText(line.text);
+        const lineText = normalize(line.text);
         
-        // Loop through our cleaned sheet data
-        for (let cleanKey in normalizedMenuData) {
-          // Check if the cleaned menu text contains our cleaned sheet item
-          if (textFoundOnMenu.includes(cleanKey) && cleanKey.length > 3) {
-            const match = normalizedMenuData[cleanKey];
-            drawOverlay(line.bbox, match.originalName, match.info);
+        Object.keys(menuData).forEach(sheetItem => {
+          const itemKey = normalize(sheetItem);
+          
+          // FUZZY MATCH: Look for the first 2 words of your sheet item
+          // This fixes issues where the AI reads half the line or misreads one character
+          const keywords = itemKey.split(' ').slice(0, 2).join(' ');
+          
+          if (lineText.includes(keywords) && keywords.length > 3) {
+            drawOverlay(line.bbox, sheetItem, menuData[sheetItem]);
             matches++;
           }
-        }
+        });
       });
 
-      status.innerText = matches > 0 ? `Found ${matches} matches!` : "No matches. Try closer.";
+      status.innerText = matches > 0 ? `Matched ${matches} items!` : "No match. Try again.";
       scanBtn.disabled = false;
       setTimeout(() => { if (!scanBtn.disabled) resetUI(); }, 8000);
     }
 
     function drawOverlay(bbox, name, info) {
       ctx.strokeStyle = "#34C759";
-      ctx.lineWidth = 10;
+      ctx.lineWidth = 12;
       ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
 
       const label = name.toUpperCase() + ": " + info;
-      ctx.font = "bold 40px Arial";
+      ctx.font = "bold 44px Arial";
       const textWidth = ctx.measureText(label).width;
       
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.fillRect(bbox.x0, bbox.y0 - 60, textWidth + 30, 60);
+      ctx.fillStyle = "rgba(0,0,0,0.85)";
+      ctx.fillRect(bbox.x0, bbox.y0 - 65, textWidth + 30, 65);
 
       ctx.fillStyle = "#34C759";
-      ctx.fillText(label, bbox.x0 + 15, bbox.y0 - 15);
+      ctx.fillText(label, bbox.x0 + 15, bbox.y0 - 18);
     }
 
     function resetUI() {
