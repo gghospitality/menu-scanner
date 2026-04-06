@@ -3,25 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Menu Scanner Pro</title>
+  <title>Somm AI Scanner</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: white; }
+    
+    /* Settings Panel */
+    #settings { background: #1a1a1a; padding: 15px; border-bottom: 1px solid #333; z-index: 2000; }
+    .select-group { margin-bottom: 10px; display: flex; flex-direction: column; }
+    label { font-size: 12px; color: #888; margin-bottom: 4px; text-transform: uppercase; }
+    select { background: #333; color: white; border: 1px solid #444; padding: 10px; border-radius: 8px; font-size: 14px; width: 100%; }
+
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-    #status { position: fixed; top: 50px; width: 80%; left: 10%; background: rgba(0,0,0,0.85); color: white; padding: 12px; border-radius: 25px; text-align: center; z-index: 1000; font-size: 14px; border: 1px solid #34C759; font-weight: bold; }
+    
+    #status { position: fixed; top: 160px; width: 80%; left: 10%; background: rgba(0,0,0,0.85); color: #34C759; padding: 10px; border-radius: 20px; text-align: center; z-index: 1000; font-size: 13px; font-weight: bold; border: 1px solid #34C759; }
+
     #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; z-index: 1000; }
-    button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 80%; transition: 0.2s; }
+    button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; }
     #startBtn { background: #007AFF; color: white; }
     #scanBtn { background: #34C759; color: white; display: none; }
-    .spinner { border: 3px solid #333; border-top: 3px solid #34C759; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+    
+    .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-  <div id="status">Syncing Menu...</div>
+  <div id="settings">
+    <div class="select-group">
+      <label>1. Select Restaurant</label>
+      <select id="restaurantSelect" onchange="filterData()">
+        <option>Loading restaurants...</option>
+      </select>
+    </div>
+    <div class="select-group">
+      <label>2. Display Mode</label>
+      <select id="modeSelect">
+        <option value="somm">Somm Pick (D)</option>
+        <option value="ai">AI Somm Pick (E,F)</option>
+        <option value="expert">Expert (H,I,J)</option>
+        <option value="basic">Basic (K,L,M)</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="status">Connecting to Master Sheet...</div>
   
   <div id="container">
     <video id="video" autoplay playsinline muted></video>
@@ -29,8 +57,8 @@
   </div>
 
   <div id="controls">
-    <button id="startBtn" onclick="initApp()">1. ENABLE CAMERA</button>
-    <button id="scanBtn" onclick="takeSnapshot()">2. SCAN MENU</button>
+    <button id="startBtn" onclick="initApp()">3. ENABLE CAMERA</button>
+    <button id="scanBtn" onclick="takeSnapshot()">4. SCAN WINE LIST</button>
   </div>
 
   <script>
@@ -40,23 +68,49 @@
     const status = document.getElementById('status');
     const startBtn = document.getElementById('startBtn');
     const scanBtn = document.getElementById('scanBtn');
+    const resSelect = document.getElementById('restaurantSelect');
+    const modeSelect = document.getElementById('modeSelect');
     
-    let menuData = {};
+    let rawSheetData = []; 
+    let activeMenu = {}; 
     let worker = null;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbw17lM5415hb2hFRMkgbSeNDe7w3eBe2ycBhlBUF4F8UVkyQv_F4iGxB8-zvndLZ3Q8/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzcvyRggwoelmh7hrDKZnelATDneBeFlYb90JexmJ8h28OTneJasntYmhFxVWrvndgl/exec";
 
     function clean(str) {
-      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+      return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : "";
     }
 
+    // A. Fetch all data on load
     window.onload = async () => {
       try {
         const response = await fetch(GAS_URL);
-        menuData = await response.json();
-        status.innerText = "Menu Synced. Ready.";
+        rawSheetData = await response.json();
+        populateRestaurants();
+        status.innerText = "Master Output Synced.";
       } catch (e) { status.innerText = "Sync Error."; }
     };
+
+    function populateRestaurants() {
+      const restaurants = [...new Set(rawSheetData.slice(1).map(row => row[0]))].sort();
+      resSelect.innerHTML = restaurants.map(r => `<option value="${r}">${r}</option>`).join('');
+      filterData();
+    }
+
+    // B. Re-filter data when restaurant is selected
+    function filterData() {
+      const selectedRes = resSelect.value;
+      activeMenu = {};
+      
+      rawSheetData.slice(1).forEach(row => {
+        if (row[0] === selectedRes) {
+          const wineName = clean(row[1]); // Assuming Column B is wine name
+          if (!activeMenu[wineName]) activeMenu[wineName] = [];
+          activeMenu[wineName].push(row);
+        }
+      });
+      status.innerText = `Ready: ${selectedRes} Menu Active`;
+    }
 
     async function initApp() {
       status.innerHTML = '<div class="spinner"></div> Opening Camera...';
@@ -68,14 +122,12 @@
         video.srcObject = stream;
         startBtn.style.display = "none";
         scanBtn.style.display = "block";
-        status.innerText = "Starting AI Engine...";
         worker = await Tesseract.createWorker('eng');
-        status.innerText = "Point at Menu and Scan";
+        status.innerText = "Point at Wine Menu and Scan";
       } catch (err) { alert("Camera Error: " + err.message); }
     }
 
     async function takeSnapshot() {
-      if (!worker) return;
       status.innerHTML = '<div class="spinner"></div> Analyzing...';
       scanBtn.disabled = true;
       canvas.width = video.videoWidth;
@@ -86,7 +138,7 @@
       try {
         const result = await worker.recognize(canvas);
         processLines(result.data.lines);
-      } catch (err) { status.innerText = "Scan Failed."; resetUI(); }
+      } catch (err) { resetUI(); }
     }
 
     function processLines(lines) {
@@ -94,61 +146,62 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height); 
 
       lines.forEach(line => {
-        const cleanScannedLine = clean(line.text);
-        if (cleanScannedLine.length < 4) return;
+        const scanText = clean(line.text);
+        if (scanText.length < 5) return;
 
-        Object.keys(menuData).forEach(sheetItem => {
-          const cleanItemName = clean(sheetItem);
-          if (cleanScannedLine.includes(cleanItemName) && cleanItemName.length > 3) {
-            // menuData[sheetItem] is now an ARRAY of descriptions
-            drawOverlay(line.bbox, sheetItem, menuData[sheetItem]);
+        Object.keys(activeMenu).forEach(wineKey => {
+          if (scanText.includes(wineKey) && wineKey.length > 4) {
+            const wineRows = activeMenu[wineKey];
+            drawOverlay(line.bbox, wineRows[0][1], wineRows);
             matches++;
           }
         });
       });
 
-      status.innerText = matches > 0 ? `Found ${matches} items!` : "No match. Try again.";
+      status.innerText = matches > 0 ? `Matched ${matches} Wines` : "No matches found.";
       scanBtn.disabled = false;
-      setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 10000);
+      setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 12000);
     }
 
-    function drawOverlay(bbox, name, infoList) {
-      // SETTINGS
-      const fontSize = 18; // Half-size text
-      const padding = 10;
-      const lineHeight = fontSize + 8;
-      
-      ctx.font = `bold ${fontSize}px Arial`;
-      
-      // Calculate max width and total height
-      const title = name.toUpperCase();
-      let maxWidth = ctx.measureText(title).width;
-      infoList.forEach(text => {
-        const w = ctx.measureText("- " + text).width;
-        if (w > maxWidth) maxWidth = w;
+    function drawOverlay(bbox, originalName, wineRows) {
+      const mode = modeSelect.value;
+      const fontSize = 16;
+      const lineHeight = 22;
+      const padding = 12;
+
+      // Extract columns based on mode
+      let displayTexts = [];
+      wineRows.forEach(row => {
+        if (mode === "somm") displayTexts.push(row[3]); // Col D
+        if (mode === "ai") displayTexts.push(`${row[4]} | ${row[5]}`); // Col E, F
+        if (mode === "expert") displayTexts.push(`${row[7]} | ${row[8]} | ${row[9]}`); // Col H, I, J
+        if (mode === "basic") displayTexts.push(`${row[10]} | ${row[11]} | ${row[12]}`); // Col K, L, M
       });
 
-      const totalBoxHeight = (lineHeight * (infoList.length + 1)) + (padding * 2);
+      ctx.font = `bold ${fontSize}px Arial`;
+      const title = originalName.toUpperCase();
+      let boxWidth = ctx.measureText(title).width;
+      displayTexts.forEach(t => {
+        const w = ctx.measureText(t).width;
+        if (w > boxWidth) boxWidth = w;
+      });
 
-      // 1. Draw pill-shaped background
-      ctx.fillStyle = "rgba(0,0,0,0.85)";
+      const totalHeight = (displayTexts.length + 1) * lineHeight + (padding * 2);
+
+      ctx.fillStyle = "rgba(0,0,0,0.9)";
       ctx.beginPath();
-      ctx.roundRect(bbox.x0, bbox.y0 - totalBoxHeight - 10, maxWidth + (padding * 2), totalBoxHeight, 10);
+      ctx.roundRect(bbox.x0, bbox.y0 - totalHeight - 10, boxWidth + (padding * 2), totalHeight, 10);
       ctx.fill();
 
-      // 2. Draw Item Title (Green)
       ctx.fillStyle = "#34C759";
-      ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalBoxHeight + padding + fontSize);
+      ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalHeight + padding + fontSize);
 
-      // 3. Draw All Descriptions Stacked (White)
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `${fontSize - 2}px Arial`; // Slightly smaller for desc
-      infoList.forEach((desc, index) => {
-        const yOffset = bbox.y0 - totalBoxHeight + padding + fontSize + (lineHeight * (index + 1));
-        ctx.fillText("• " + desc, bbox.x0 + padding, yOffset);
+      ctx.fillStyle = "white";
+      ctx.font = `${fontSize - 2}px Arial`;
+      displayTexts.forEach((txt, i) => {
+        ctx.fillText(txt, bbox.x0 + padding, bbox.y0 - totalHeight + padding + fontSize + (lineHeight * (i + 1)));
       });
 
-      // 4. Draw underlining box on the menu
       ctx.strokeStyle = "#34C759";
       ctx.lineWidth = 3;
       ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
