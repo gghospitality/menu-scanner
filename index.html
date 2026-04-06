@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"> 
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -14,42 +14,44 @@
     .menu-group { position: relative; }
     
     .menu-trigger { 
-      background: rgba(40, 40, 40, 0.9); 
-      border: 1px solid #444; 
+      background: rgba(40, 40, 40, 0.95); 
+      border: 1px solid #555; 
       color: white; 
-      width: 45px; height: 45px; 
+      width: 50px; height: 50px; 
       border-radius: 50%; 
       display: flex; align-items: center; justify-content: center; 
-      font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+      font-size: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); 
+      cursor: pointer;
     }
 
     .menu-content { 
-      position: absolute; left: 55px; top: 0; 
-      background: rgba(30, 30, 30, 0.95); 
+      position: absolute; left: 60px; top: 0; 
+      background: rgba(25, 25, 25, 0.98); 
       border: 1px solid #444; 
-      border-radius: 12px; 
+      border-radius: 15px; 
       display: none; /* Hidden by default */
       flex-direction: column; 
-      min-width: 200px; max-height: 300px; 
-      overflow-y: auto; box-shadow: 0 8px 20px rgba(0,0,0,0.8);
+      min-width: 220px; max-height: 400px; 
+      overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      -webkit-overflow-scrolling: touch;
     }
 
     .menu-item { 
-      padding: 15px; border-bottom: 1px solid #333; 
-      font-size: 14px; color: #ddd; white-space: nowrap; 
+      padding: 16px; border-bottom: 1px solid #333; 
+      font-size: 14px; color: #ccc; white-space: nowrap; 
     }
     .menu-item:active { background: #34C759; color: black; }
-    .menu-item.active { border-left: 4px solid #34C759; color: #fff; background: #222; }
+    .menu-item.active { border-left: 5px solid #34C759; color: #fff; background: #222; font-weight: bold; }
 
     /* 2. Layout & Video */
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     
-    #status { position: fixed; top: 55px; right: 15px; width: 50%; background: rgba(0,0,0,0.7); color: #34C759; padding: 10px; border-radius: 20px; text-align: center; z-index: 1000; font-size: 11px; border: 1px solid #34C759; }
+    #status { position: fixed; top: 55px; right: 15px; width: 45%; background: rgba(0,0,0,0.75); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; z-index: 1000; font-size: 11px; border: 1px solid #34C759; pointer-events: none; }
 
-    #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 110px; z-index: 1000; }
-    button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; }
+    #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 110px; z-index: 1000; border-top: 1px solid #333; }
+    button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; transition: 0.2s; }
     #startBtn { background: #007AFF; color: white; }
     #scanBtn { background: #34C759; color: white; display: none; }
     
@@ -61,7 +63,7 @@
 
   <!-- Floating Navigation -->
   <div id="menu-nav">
-    <!-- Restaurant Menu -->
+    <!-- Restaurant Selection -->
     <div class="menu-group">
       <div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div>
       <div id="resMenu" class="menu-content">
@@ -69,7 +71,7 @@
       </div>
     </div>
 
-    <!-- Mode Menu -->
+    <!-- Display Mode Selection -->
     <div class="menu-group">
       <div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div>
       <div id="modeMenu" class="menu-content">
@@ -81,7 +83,7 @@
     </div>
   </div>
 
-  <div id="status">Syncing...</div>
+  <div id="status">Syncing Sheets...</div>
   
   <div id="container">
     <video id="video" autoplay playsinline muted></video>
@@ -107,9 +109,10 @@
     let currentRestaurant = "";
     let worker = null;
 
+    // --- YOUR MASTER DEPLOYMENT URL ---
     const GAS_URL = "https://script.google.com/macros/s/AKfycbysn-9xM-WFOeDr-RPrmkNsO5ch7sOqQ9_zWZZL_IrXUtygQnlHnz0wAfxyxYsDwXMw/exec";
 
-    // Toggle Menu Visibility
+    // Toggle logic for hamburger menus
     function toggleMenu(id) {
       const menus = ['resMenu', 'modeMenu'];
       menus.forEach(m => {
@@ -138,22 +141,28 @@
 
     async function loadSheetData() {
       try {
+        status.innerText = "Syncing Master Sheet...";
         const response = await fetch(GAS_URL, { redirect: 'follow' });
         rawSheetData = await response.json();
+        if (rawSheetData.error) throw new Error(rawSheetData.error);
         populateRestaurants();
         status.innerText = "Synced. Pick Restaurant 🍴";
-      } catch (e) { status.innerText = "Sync Error."; }
+      } catch (e) { 
+        status.innerText = "Sync Error."; 
+        console.error(e);
+      }
     }
 
     function populateRestaurants() {
       const resContainer = document.getElementById('resMenu');
+      // Extract unique names from Column A (Index 0)
       const restaurants = [...new Set(rawSheetData.slice(1).map(row => row[0]))].filter(r => r).sort();
       
       resContainer.innerHTML = restaurants.map(r => 
         `<div class="menu-item" onclick="setRestaurant('${r.replace(/'/g, "\\'")}', this)">${r}</div>`
       ).join('');
       
-      // Auto-select first one
+      // Auto-select first restaurant in list
       if (restaurants.length > 0) {
         setRestaurant(restaurants[0], resContainer.firstChild);
       }
@@ -165,16 +174,17 @@
       document.querySelectorAll('#resMenu .menu-item').forEach(i => i.classList.remove('active'));
       if(el) el.classList.add('active');
       
+      // Filter rows based on selected restaurant
       rawSheetData.slice(1).forEach(row => {
         if (row[0] === res) {
-          const wineName = clean(row[1]);
+          const wineName = clean(row[1]); // Wine Name is Column B
           if (!activeMenu[wineName]) activeMenu[wineName] = [];
           activeMenu[wineName].push(row);
         }
       });
       
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = `${res} Menu Loaded`;
+      status.innerText = `${res} Active`;
     }
 
     async function initApp() {
@@ -189,7 +199,7 @@
         scanBtn.style.display = "block";
         worker = await Tesseract.createWorker('eng');
         status.innerText = "Ready to Scan";
-      } catch (err) { alert("Camera Error: " + err.message); }
+      } catch (err) { alert("Camera Access Error: " + err.message); }
     }
 
     async function takeSnapshot() {
@@ -216,7 +226,8 @@
 
         Object.keys(activeMenu).forEach(wineKey => {
           if (scanText.includes(wineKey) && wineKey.length > 4) {
-            drawOverlay(line.bbox, activeMenu[wineKey][0][1], activeMenu[wineKey]);
+            const wineRows = activeMenu[wineKey];
+            drawOverlay(line.bbox, wineRows[0][1], wineRows);
             matches++;
           }
         });
@@ -224,7 +235,7 @@
 
       status.innerText = matches > 0 ? `Matched ${matches} Wines` : "No matches found.";
       scanBtn.disabled = false;
-      setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 12000);
+      setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 15000);
     }
 
     function drawOverlay(bbox, originalName, wineRows) {
@@ -233,12 +244,33 @@
       const padding = 12;
 
       let displayTexts = [];
-      wineRows.forEach(row => {
+      
+      // --- DUPLICATE LOGIC ---
+      // Display all matching rows ONLY for Somm Pick. 
+      // Otherwise, only take the first row [0].
+      const rowsToProcess = (currentMode === "somm") ? wineRows : [wineRows[0]];
+
+      rowsToProcess.forEach(row => {
         if (currentMode === "somm") { if(row[3]) displayTexts.push(row[3]); }
-        if (currentMode === "ai") { if(row[4]) displayTexts.push(row[4]); if(row[5]) displayTexts.push(row[5]); }
-        if (currentMode === "expert") { if(row[7]) displayTexts.push(row[7]); if(row[8]) displayTexts.push(row[8]); if(row[9]) displayTexts.push(row[9]); }
-        if (currentMode === "basic") { if(row[10]) displayTexts.push(row[10]); if(row[11]) displayTexts.push(row[11]); if(row[12]) displayTexts.push(row[12]); }
+        if (currentMode === "ai") { 
+            if(row[4]) displayTexts.push(row[4]); 
+            if(row[5]) displayTexts.push(row[5]); 
+        }
+        if (currentMode === "expert") { 
+            if(row[7]) displayTexts.push(row[7]); 
+            if(row[8]) displayTexts.push(row[8]); 
+            if(row[9]) displayTexts.push(row[9]); 
+        }
+        if (currentMode === "basic") { 
+            if(row[10]) displayTexts.push(row[10]); 
+            if(row[11]) displayTexts.push(row[11]); 
+            if(row[12]) displayTexts.push(row[12]); 
+        }
       });
+
+      // Filter out empty strings
+      displayTexts = displayTexts.filter(t => t && t.toString().trim() !== "");
+      if (displayTexts.length === 0) return;
 
       ctx.font = `bold ${fontSize}px Arial`;
       const title = originalName.toUpperCase();
@@ -249,20 +281,26 @@
       });
 
       const totalHeight = (displayTexts.length + 1) * lineHeight + (padding * 2);
-      ctx.fillStyle = "rgba(0,0,0,0.95)";
+
+      // Draw Box
+      ctx.fillStyle = "rgba(0,0,0,0.92)";
       ctx.beginPath();
       ctx.roundRect(bbox.x0, bbox.y0 - totalHeight - 10, boxWidth + (padding * 2), totalHeight, 10);
       ctx.fill();
 
+      // Title Line (Green)
       ctx.fillStyle = "#34C759";
       ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalHeight + padding + fontSize);
 
+      // Info Lines (Stacked White)
       ctx.fillStyle = "white";
       ctx.font = `${fontSize - 2}px Arial`;
       displayTexts.forEach((txt, i) => {
-        ctx.fillText("• " + txt, bbox.x0 + padding, bbox.y0 - totalHeight + padding + fontSize + (lineHeight * (i + 1)));
+        const yPos = bbox.y0 - totalHeight + padding + fontSize + (lineHeight * (i + 1));
+        ctx.fillText("• " + txt, bbox.x0 + padding, yPos);
       });
 
+      // Underline highlight
       ctx.strokeStyle = "#34C759";
       ctx.lineWidth = 3;
       ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
