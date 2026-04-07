@@ -8,11 +8,46 @@
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: white; }
     
-    /* 1. Floating Hamburger Menus */
+    /* --- SPLASH SCREEN --- */
+    #splash-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: #ffffff; /* White background to match the logo */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999; /* Highest priority */
+      transition: opacity 0.8s ease;
+    }
+    #splash-screen img {
+      width: 70%;
+      max-width: 400px;
+      height: auto;
+    }
+    .loader-bar {
+      margin-top: 20px;
+      width: 50%;
+      height: 4px;
+      background: #eee;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .loader-progress {
+      width: 100%;
+      height: 100%;
+      background: #002d58; /* Matching the blue in your logo */
+      animation: loading 2s linear forwards;
+    }
+    @keyframes loading {
+      from { width: 0%; }
+      to { width: 100%; }
+    }
+
+    /* --- FLOATING MENUS --- */
     #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; }
-    
     .menu-group { position: relative; }
-    
     .menu-trigger { 
       background: rgba(40, 40, 40, 0.95); 
       border: 1px solid #555; 
@@ -23,35 +58,27 @@
       font-size: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); 
       cursor: pointer;
     }
-
     .menu-content { 
       position: absolute; left: 60px; top: 0; 
       background: rgba(25, 25, 25, 0.98); 
       border: 1px solid #444; 
       border-radius: 15px; 
-      display: none; /* Hidden by default */
+      display: none; 
       flex-direction: column; 
       min-width: 220px; max-height: 400px; 
       overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       -webkit-overflow-scrolling: touch;
     }
-
-    .menu-item { 
-      padding: 16px; border-bottom: 1px solid #333; 
-      font-size: 14px; color: #ccc; white-space: nowrap; 
-    }
-    .menu-item:active { background: #34C759; color: black; }
+    .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; color: #ccc; }
     .menu-item.active { border-left: 5px solid #34C759; color: #fff; background: #222; font-weight: bold; }
 
-    /* 2. Layout & Video */
+    /* --- MAIN UI --- */
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-    
-    #status { position: fixed; top: 55px; right: 15px; width: 45%; background: rgba(0,0,0,0.75); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; z-index: 1000; font-size: 11px; border: 1px solid #34C759; pointer-events: none; }
-
+    #status { position: fixed; top: 55px; right: 15px; width: 45%; background: rgba(0,0,0,0.75); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; z-index: 1000; font-size: 11px; border: 1px solid #34C759; }
     #controls { min-height: 160px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 110px; z-index: 1000; border-top: 1px solid #333; }
-    button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; transition: 0.2s; }
+    button { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; }
     #startBtn { background: #007AFF; color: white; }
     #scanBtn { background: #34C759; color: white; display: none; }
     
@@ -61,17 +88,24 @@
 </head>
 <body>
 
-  <!-- Floating Navigation -->
+  <!-- 1. SPLASH SCREEN LAYER -->
+  <div id="splash-screen">
+    <!-- Ensure logo.png is uploaded to your GitHub repo -->
+    <img src="logo.png" alt="Sommurai Logo">
+    <div class="loader-bar">
+      <div class="loader-progress"></div>
+    </div>
+    <p style="color: #666; font-size: 12px; margin-top: 10px;">LOADING SOMMURAI AI...</p>
+  </div>
+
+  <!-- 2. NAVIGATION MENUS -->
   <div id="menu-nav">
-    <!-- Restaurant Selection -->
     <div class="menu-group">
       <div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div>
       <div id="resMenu" class="menu-content">
-        <div class="menu-item">Loading data...</div>
+        <div class="menu-item">Connecting to master data...</div>
       </div>
     </div>
-
-    <!-- Display Mode Selection -->
     <div class="menu-group">
       <div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div>
       <div id="modeMenu" class="menu-content">
@@ -109,19 +143,29 @@
     let currentRestaurant = "";
     let worker = null;
 
-    // --- YOUR MASTER DEPLOYMENT URL ---
     const GAS_URL = "https://script.google.com/macros/s/AKfycbysn-9xM-WFOeDr-RPrmkNsO5ch7sOqQ9_zWZZL_IrXUtygQnlHnz0wAfxyxYsDwXMw/exec";
 
-    // Toggle logic for hamburger menus
+    // --- SPLASH SCREEN LOGIC ---
+    window.onload = () => {
+      // Begin loading data in background
+      loadSheetData();
+
+      // Show splash for 2 seconds then fade out
+      setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        splash.style.opacity = '0';
+        setTimeout(() => {
+          splash.style.display = 'none';
+        }, 800); // Wait for transition to finish
+      }, 2000);
+    };
+
     function toggleMenu(id) {
       const menus = ['resMenu', 'modeMenu'];
       menus.forEach(m => {
         const el = document.getElementById(m);
-        if (m === id) {
-          el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
-        } else {
-          el.style.display = 'none';
-        }
+        if (m === id) { el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+        else { el.style.display = 'none'; }
       });
     }
 
@@ -137,35 +181,22 @@
       return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : "";
     }
 
-    window.onload = loadSheetData;
-
     async function loadSheetData() {
       try {
-        status.innerText = "Syncing Master Sheet...";
         const response = await fetch(GAS_URL, { redirect: 'follow' });
         rawSheetData = await response.json();
-        if (rawSheetData.error) throw new Error(rawSheetData.error);
         populateRestaurants();
         status.innerText = "Synced. Pick Restaurant 🍴";
-      } catch (e) { 
-        status.innerText = "Sync Error."; 
-        console.error(e);
-      }
+      } catch (e) { status.innerText = "Sync Error."; }
     }
 
     function populateRestaurants() {
       const resContainer = document.getElementById('resMenu');
-      // Extract unique names from Column A (Index 0)
       const restaurants = [...new Set(rawSheetData.slice(1).map(row => row[0]))].filter(r => r).sort();
-      
       resContainer.innerHTML = restaurants.map(r => 
         `<div class="menu-item" onclick="setRestaurant('${r.replace(/'/g, "\\'")}', this)">${r}</div>`
       ).join('');
-      
-      // Auto-select first restaurant in list
-      if (restaurants.length > 0) {
-        setRestaurant(restaurants[0], resContainer.firstChild);
-      }
+      if (restaurants.length > 0) { setRestaurant(restaurants[0], resContainer.firstChild); }
     }
 
     function setRestaurant(res, el) {
@@ -174,21 +205,19 @@
       document.querySelectorAll('#resMenu .menu-item').forEach(i => i.classList.remove('active'));
       if(el) el.classList.add('active');
       
-      // Filter rows based on selected restaurant
       rawSheetData.slice(1).forEach(row => {
         if (row[0] === res) {
-          const wineName = clean(row[1]); // Wine Name is Column B
+          const wineName = clean(row[1]);
           if (!activeMenu[wineName]) activeMenu[wineName] = [];
           activeMenu[wineName].push(row);
         }
       });
-      
       document.getElementById('resMenu').style.display = 'none';
       status.innerText = `${res} Active`;
     }
 
     async function initApp() {
-      status.innerHTML = '<div class="spinner"></div> Opening Camera...';
+      status.innerHTML = '<div class="spinner"></div> Camera On...';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: "environment", width: { ideal: 1920 } }, 
@@ -199,7 +228,7 @@
         scanBtn.style.display = "block";
         worker = await Tesseract.createWorker('eng');
         status.innerText = "Ready to Scan";
-      } catch (err) { alert("Camera Access Error: " + err.message); }
+      } catch (err) { alert("Camera Error: " + err.message); }
     }
 
     async function takeSnapshot() {
@@ -226,14 +255,12 @@
 
         Object.keys(activeMenu).forEach(wineKey => {
           if (scanText.includes(wineKey) && wineKey.length > 4) {
-            const wineRows = activeMenu[wineKey];
-            drawOverlay(line.bbox, wineRows[0][1], wineRows);
+            drawOverlay(line.bbox, activeMenu[wineKey][0][1], activeMenu[wineKey]);
             matches++;
           }
         });
       });
-
-      status.innerText = matches > 0 ? `Matched ${matches} Wines` : "No matches found.";
+      status.innerText = matches > 0 ? `${matches} Matches` : "No matches.";
       scanBtn.disabled = false;
       setTimeout(() => { if(!scanBtn.disabled) resetUI(); }, 15000);
     }
@@ -242,33 +269,16 @@
       const fontSize = 16;
       const lineHeight = 22;
       const padding = 12;
-
       let displayTexts = [];
-      
-      // --- DUPLICATE LOGIC ---
-      // Display all matching rows ONLY for Somm Pick. 
-      // Otherwise, only take the first row [0].
       const rowsToProcess = (currentMode === "somm") ? wineRows : [wineRows[0]];
 
       rowsToProcess.forEach(row => {
-        if (currentMode === "somm") { if(row[3]) displayTexts.push(row[3]); }
-        if (currentMode === "ai") { 
-            if(row[4]) displayTexts.push(row[4]); 
-            if(row[5]) displayTexts.push(row[5]); 
-        }
-        if (currentMode === "expert") { 
-            if(row[7]) displayTexts.push(row[7]); 
-            if(row[8]) displayTexts.push(row[8]); 
-            if(row[9]) displayTexts.push(row[9]); 
-        }
-        if (currentMode === "basic") { 
-            if(row[10]) displayTexts.push(row[10]); 
-            if(row[11]) displayTexts.push(row[11]); 
-            if(row[12]) displayTexts.push(row[12]); 
-        }
+        if (currentMode === "somm" && row[3]) displayTexts.push(row[3]);
+        if (currentMode === "ai") { if(row[4]) displayTexts.push(row[4]); if(row[5]) displayTexts.push(row[5]); }
+        if (currentMode === "expert") { if(row[7]) displayTexts.push(row[7]); if(row[8]) displayTexts.push(row[8]); if(row[9]) displayTexts.push(row[9]); }
+        if (currentMode === "basic") { if(row[10]) displayTexts.push(row[10]); if(row[11]) displayTexts.push(row[11]); if(row[12]) displayTexts.push(row[12]); }
       });
 
-      // Filter out empty strings
       displayTexts = displayTexts.filter(t => t && t.toString().trim() !== "");
       if (displayTexts.length === 0) return;
 
@@ -281,26 +291,18 @@
       });
 
       const totalHeight = (displayTexts.length + 1) * lineHeight + (padding * 2);
-
-      // Draw Box
       ctx.fillStyle = "rgba(0,0,0,0.92)";
       ctx.beginPath();
       ctx.roundRect(bbox.x0, bbox.y0 - totalHeight - 10, boxWidth + (padding * 2), totalHeight, 10);
       ctx.fill();
-
-      // Title Line (Green)
       ctx.fillStyle = "#34C759";
       ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalHeight + padding + fontSize);
-
-      // Info Lines (Stacked White)
       ctx.fillStyle = "white";
       ctx.font = `${fontSize - 2}px Arial`;
       displayTexts.forEach((txt, i) => {
         const yPos = bbox.y0 - totalHeight + padding + fontSize + (lineHeight * (i + 1));
         ctx.fillText("• " + txt, bbox.x0 + padding, yPos);
       });
-
-      // Underline highlight
       ctx.strokeStyle = "#34C759";
       ctx.lineWidth = 3;
       ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
