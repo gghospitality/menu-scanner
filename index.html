@@ -199,4 +199,14 @@
         displayTexts = displayTexts.filter(t => t);
         const totalH = (displayTexts.length + 1) * lineHeight + (padding * 2);
         ctx.fillStyle = "rgba(0,0,0,0.9)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 10, 280, totalH, 10); ctx.fill();
-        ctx.fillStyle = "#34C759"; ct
+        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
+        ctx.fillStyle = "white"; ctx.font = "12px Arial";
+        displayTexts.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))));
+    }
+
+    function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
+    function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+    function setMode(mode, el) { currentMode = mode; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active')); el.classList.add('active'); toggleMenu('modeMenu'); }
+  </script>
+</body>
+</html>
