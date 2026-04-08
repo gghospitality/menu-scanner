@@ -36,19 +36,20 @@
     /* CENTERED STATUS BAR */
     #status { 
       position: fixed; top: 55px; left: 50%; transform: translateX(-50%); 
-      width: 70%; background: rgba(0,0,0,0.8); color: #34C759; 
+      width: 70%; background: rgba(0,0,0,0.85); color: #34C759; 
       padding: 12px; border-radius: 25px; text-align: center; 
-      font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; 
+      font-size: 13px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; 
+      pointer-events: none;
     }
 
     /* LIFTED CONTROLS FOR iOS */
     #controls { 
-      min-height: 180px; background: #1a1a1a; 
+      min-height: 200px; background: #1a1a1a; 
       display: flex; flex-direction: column; justify-content: center; align-items: center; 
-      padding-bottom: 110px; /* High padding to clear iOS home bar and Safari UI */
+      padding-bottom: 125px; /* Lifted higher for Safari/iOS Home Bar */
       border-top: 1px solid #333; 
     }
-    #mainBtn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+    #mainBtn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     
     .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -56,6 +57,7 @@
 </head>
 <body>
 
+  <!-- SPLASH SCREEN -->
   <div id="splash-screen">
     <div id="splash-buttons">
         <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">Scan Menu</button>
@@ -65,6 +67,7 @@
     <img src="logo.png" alt="Sommurai Logo">
   </div>
 
+  <!-- FLOATING MENUS -->
   <div id="menu-nav">
     <div class="menu-group"><div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div><div id="resMenu" class="menu-content"></div></div>
     <div class="menu-group" id="logic-trigger" style="display:none;"><div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div><div id="modeMenu" class="menu-content">
@@ -75,7 +78,8 @@
     </div></div>
   </div>
 
-  <div id="status">Waking up...</div>
+  <!-- STATUS MESSAGE -->
+  <div id="status">Ready</div>
   
   <div id="container">
     <video id="video" autoplay playsinline muted></video>
@@ -91,8 +95,8 @@
     const status = document.getElementById('status'), mainBtn = document.getElementById('mainBtn');
     let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
 
-    // Use the latest deployment URL provided
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxVbdL5svqZfDWwICiI3TbrG2yX3s5P0sg5aeo0agQUhDaC77IvpBskwFFFdrtM1K64/exec";
+    // LATEST DEPLOYMENT URL
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyp1HgNrAqQpGYDKfTFv2Cm4XTyf0LDpdwuhWaku4seVSh5nzQjztfUM725oAk4p1yG/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -115,7 +119,7 @@
         status.innerText = "Camera Ready";
         worker = await Tesseract.createWorker('eng');
       } catch (e) {
-        status.innerText = "Camera Error";
+        status.innerText = "Camera Access Error";
         alert("Camera Error: " + e.message);
       }
     }
@@ -150,27 +154,35 @@
     }
 
     async function captureAndUpload() {
-      status.innerHTML = '<div class="spinner"></div> Uploading to Drive...';
+      status.innerHTML = '<div class="spinner"></div> Uploading...';
       canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
       const base64 = canvas.toDataURL('image/png');
       
       const result = await worker.recognize(canvas);
       
+      // POST without 'application/json' header to bypass CORS pre-flight
       fetch(GAS_URL, {
         method: "POST",
         body: JSON.stringify({ base64: base64, ocr: result.data.text, type: appMode })
       })
       .then(r => r.json())
       .then(res => {
-        status.innerText = "Saved to Drive!";
-        document.getElementById('logic-trigger').style.display = 'block';
+        if(res.success) {
+            status.innerText = "Saved to Drive!";
+            document.getElementById('logic-trigger').style.display = 'block';
+        } else {
+            status.innerText = "Error: " + res.error;
+        }
       })
-      .catch(e => { status.innerText = "Upload Failed"; });
+      .catch(e => { 
+        status.innerText = "Upload Failed"; 
+        alert("Upload Error: Check GAS Deployment settings.");
+      });
     }
 
     async function takeSnapshot() {
-      status.innerHTML = '<div class="spinner"></div> Analyzing Wines...';
+      status.innerHTML = '<div class="spinner"></div> Analyzing...';
       canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
       const result = await worker.recognize(canvas);
@@ -191,17 +203,21 @@
         let displayTexts = [];
         const rowsToProcess = (currentMode === "somm") ? rows : [rows[0]];
         rowsToProcess.forEach(row => {
-          if (currentMode === "somm") displayTexts.push(row[3]);
-          if (currentMode === "ai") { displayTexts.push(row[4]); displayTexts.push(row[5]); }
-          if (currentMode === "expert") { displayTexts.push(row[7]); displayTexts.push(row[8]); displayTexts.push(row[9]); }
-          if (currentMode === "basic") { displayTexts.push(row[10]); displayTexts.push(row[11]); displayTexts.push(row[12]); }
+          if (currentMode === "somm") { if(row[3]) displayTexts.push(row[3]); }
+          if (currentMode === "ai") { if(row[4]) displayTexts.push(row[4]); if(row[5]) displayTexts.push(row[5]); }
+          if (currentMode === "expert") { if(row[7]) displayTexts.push(row[7]); if(row[8]) displayTexts.push(row[8]); if(row[9]) displayTexts.push(row[9]); }
+          if (currentMode === "basic") { if(row[10]) displayTexts.push(row[10]); if(row[11]) displayTexts.push(row[11]); if(row[12]) displayTexts.push(row[12]); }
         });
         displayTexts = displayTexts.filter(t => t);
+        if(displayTexts.length === 0) return;
+
         const totalH = (displayTexts.length + 1) * lineHeight + (padding * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.9)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 10, 280, totalH, 10); ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 10, 300, totalH, 10); ctx.fill();
         ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = "12px Arial";
         displayTexts.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))));
+        
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
