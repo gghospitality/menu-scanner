@@ -16,27 +16,26 @@
     .btn-green { background: #34C759; }
     #splash-screen img { width: 70%; max-width: 300px; }
 
-    /* RESET BUTTON (Top Center) */
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; letter-spacing: 1px; }
+    /* RESET BUTTON */
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; }
 
     /* UI LAYOUT */
-    #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
-    video { width: 100%; height: 100%; object-fit: cover; }
+    #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; display: flex; }
+    video { width: 100%; height: 100%; object-fit: cover; display: block; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     
     /* MENUS */
     #menu-nav { position: fixed; top: 55px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
-    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; }
-    .menu-content { position: absolute; left: 60px; top: 0; background: rgba(25, 25, 25, 0.98); border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .menu-content { position: absolute; left: 60px; top: 0; background: rgba(25, 25, 25, 0.98); border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
     .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
     .menu-item.active { border-left: 5px solid #34C759; background: #222; font-weight: bold; }
 
-    /* STATUS BAR */
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
     
-    /* LIFTED CONTROLS */
+    /* CONTROLS */
     #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
-    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; }
     
     .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -65,7 +64,7 @@
     </div></div>
   </div>
 
-  <div id="status">Syncing...</div>
+  <div id="status">Syncing Data...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -73,15 +72,12 @@
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
     const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
-    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
-    let lastScannedWineText = "";
+    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
     let isLiveScanning = false;
-
-    // SPATIAL BUFFER
     let persistentMatches = [];
-    const DECAY_TIME = 4500; // Items stay for 4.5 seconds
+    const DECAY_TIME = 4500;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycb-jJNpIQ8qv2GJJRzWutjyfMkpBMQVn2zOSHqNyVtYLKSn0KjZMFagy6E4VfSoOrT2/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxVbdL5svqZfDWwICiI3TbrG2yX3s5P0sg5aeo0agQUhDaC77IvpBskwFFFdrtM1K64/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -91,16 +87,33 @@
       
       actionBtn.innerText = (mode === 'Scan Menu') ? "START LIVE SCAN" : "CAPTURE WINE LIST";
       
-      initCamera();
-      loadSheetData();
-      requestAnimationFrame(renderLoop); // Start the 60fps drawing engine
+      status.innerText = "Initializing Camera...";
+      const cameraStarted = await initCamera();
+      
+      if (cameraStarted) {
+        loadSheetData();
+        requestAnimationFrame(renderLoop);
+      }
     }
 
     async function initCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } }, audio: false });
-      video.srcObject = stream;
-      worker = await Tesseract.createWorker('eng');
-      status.innerText = "Ready";
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "environment", width: { ideal: 1280 } }, 
+            audio: false 
+        });
+        video.srcObject = stream;
+        await video.play(); // Explicitly play for Safari
+        
+        status.innerText = "Loading AI Engine...";
+        worker = await Tesseract.createWorker('eng');
+        status.innerText = "Ready";
+        return true;
+      } catch (e) {
+        status.innerText = "Camera Error";
+        alert("Camera Error: " + e.message);
+        return false;
+      }
     }
 
     async function loadSheetData() {
@@ -121,7 +134,7 @@
       rawSheetData.slice(1).forEach(row => { if (row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
       status.innerText = `${res} Active`;
-      persistentMatches = []; // Reset screen on restaurant change
+      persistentMatches = [];
     }
 
     function setMode(mode, el) {
@@ -129,7 +142,7 @@
       document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active'));
       el.classList.add('active');
       document.getElementById('modeMenu').style.display = 'none';
-      persistentMatches = []; // Force refresh overlays with new logic
+      persistentMatches = [];
     }
 
     async function handleAction() {
@@ -139,10 +152,16 @@
 
     async function captureWineList() {
       status.innerHTML = '<div class="spinner"></div> Storing Wine List...';
-      canvas.width = 1000; canvas.height = video.videoHeight * (1000 / video.videoWidth);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const result = await worker.recognize(canvas);
+      const off = document.createElement('canvas');
+      off.width = 1000; off.height = video.videoHeight * (1000 / video.videoWidth);
+      off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
+      
+      const result = await worker.recognize(off);
       lastScannedWineText = clean(result.data.text);
+      
+      const base64 = off.toDataURL('image/jpeg', 0.7);
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) });
+      
       status.innerText = "Wine List Stored!";
       alert("Wine List Saved! Switch to Step 2: Live Menu Scan.");
       appMode = 'Scan Menu';
@@ -159,7 +178,6 @@
     async function runAutoScan() {
       if (!isLiveScanning) return;
       
-      // Perform OCR on a low-res hidden canvas for speed
       const offscreen = document.createElement('canvas');
       offscreen.width = 640; 
       offscreen.height = video.videoHeight * (640 / video.videoWidth);
@@ -170,7 +188,7 @@
         updateBuffer(result.data.lines, offscreen.width, offscreen.height);
       } catch (e) {}
 
-      if (isLiveScanning) setTimeout(runAutoScan, 400); // OCR loop frequency
+      if (isLiveScanning) setTimeout(runAutoScan, 500);
     }
 
     function updateBuffer(lines, scanW, scanH) {
@@ -185,27 +203,23 @@
         Object.keys(activeMenu).forEach(key => {
           if (scanText.includes(key) && key.length > 4) {
             const wineRows = activeMenu[key];
-            const row = wineRows[0];
-            
-            // Context check: Is the recommended wine on the physical wine list?
             let rec = "";
-            if (currentMode === "somm") rec = row[3];
-            else if (currentMode === "ai") rec = row[4];
-            else if (currentMode === "expert") rec = row[7];
-            else if (currentMode === "basic") rec = row[10];
+            if (currentMode === "somm") rec = wineRows[0][3];
+            else if (currentMode === "ai") rec = wineRows[0][4];
+            else if (currentMode === "expert") rec = wineRows[0][7];
+            else if (currentMode === "basic") rec = wineRows[0][10];
 
             if (lastScannedWineText === "" || lastScannedWineText.includes(clean(rec))) {
               const scaledBbox = {
                 x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY,
                 x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY
               };
-              
-              const existingIdx = persistentMatches.findIndex(m => m.itemName === key);
-              if (existingIdx > -1) {
-                persistentMatches[existingIdx].bbox = scaledBbox;
-                persistentMatches[existingIdx].lastSeen = now;
+              const idx = persistentMatches.findIndex(m => m.itemName === key);
+              if (idx > -1) {
+                persistentMatches[idx].bbox = scaledBbox;
+                persistentMatches[idx].lastSeen = now;
               } else {
-                persistentMatches.push({ itemName: row[1], bbox: scaledBbox, rows: wineRows, lastSeen: now });
+                persistentMatches.push({ itemName: wineRows[0][1], bbox: scaledBbox, rows: wineRows, lastSeen: now });
               }
             }
           }
@@ -214,26 +228,20 @@
     }
 
     function renderLoop() {
-      if (!isLiveScanning && persistentMatches.length === 0) {
-        requestAnimationFrame(renderLoop);
-        return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          if (canvas.width !== video.videoWidth) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const now = Date.now();
+          persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
+          persistentMatches.forEach(match => {
+            const age = now - match.lastSeen;
+            const opacity = age > (DECAY_TIME - 1000) ? (DECAY_TIME - age) / 1000 : 1;
+            drawOverlay(match.bbox, match.itemName, match.rows, opacity);
+          });
       }
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (canvas.width !== video.videoWidth) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-      }
-
-      const now = Date.now();
-      persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
-
-      persistentMatches.forEach(match => {
-        const age = now - match.lastSeen;
-        const opacity = age > (DECAY_TIME - 1000) ? (DECAY_TIME - age) / 1000 : 1;
-        drawOverlay(match.bbox, match.itemName, match.rows, opacity);
-      });
-
       requestAnimationFrame(renderLoop);
     }
 
@@ -241,14 +249,12 @@
         const fontSize = 14, lineHeight = 20, padding = 15;
         let displayTexts = [];
         const rowsToProcess = (currentMode === "somm") ? rows : [rows[0]];
-        
         rowsToProcess.forEach(row => {
-          if (currentMode === "somm" && row[3]) displayTexts.push(row[3]);
-          if (currentMode === "ai") { if(row[4]) displayTexts.push(row[4]); if(row[5]) displayTexts.push(row[5]); }
-          if (currentMode === "expert") { if(row[7]) displayTexts.push(row[7]); if(row[8]) displayTexts.push(row[8]); if(row[9]) displayTexts.push(row[9]); }
-          if (currentMode === "basic") { if(row[10]) displayTexts.push(row[10]); if(row[11]) displayTexts.push(row[11]); if(row[12]) displayTexts.push(row[12]); }
+          if (currentMode === "somm") displayTexts.push(row[3]);
+          if (currentMode === "ai") { displayTexts.push(row[4]); displayTexts.push(row[5]); }
+          if (currentMode === "expert") { displayTexts.push(row[7]); displayTexts.push(row[8]); displayTexts.push(row[9]); }
+          if (currentMode === "basic") { displayTexts.push(row[10]); displayTexts.push(row[11]); displayTexts.push(row[12]); }
         });
-
         displayTexts = displayTexts.filter(t => t);
         if (displayTexts.length === 0) return;
 
@@ -263,13 +269,14 @@
         ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
         ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
-        displayTexts.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
+        displayTexts.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))));
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
         ctx.globalAlpha = 1.0;
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
     function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+    function setMode(mode, el) { currentMode = mode; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active')); el.classList.add('active'); toggleMenu('modeMenu'); }
   </script>
 </body>
 </html>
