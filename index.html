@@ -11,33 +11,34 @@
     /* SPLASH SCREEN */
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
-    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; }
+    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
     .btn-blue { background: #002d58; }
     .btn-green { background: #34C759; }
     #splash-screen img { width: 70%; max-width: 300px; }
 
+    /* RESET BUTTON (Top Center) */
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; letter-spacing: 1px; }
+
     /* UI LAYOUT */
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
-    video { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s; }
+    video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     
-    /* RESET BUTTON */
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.2); border: 1px solid #fff; color: white; padding: 5px 15px; border-radius: 15px; font-size: 12px; z-index: 5000; display: none; }
-
     /* MENUS */
-    #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
-    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    .menu-content { position: absolute; left: 60px; top: 0; background: rgba(25,25,25,0.98); border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
+    #menu-nav { position: fixed; top: 55px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
+    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; }
+    .menu-content { position: absolute; left: 60px; top: 0; background: rgba(25, 25, 25, 0.98); border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
     .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
     .menu-item.active { border-left: 5px solid #34C759; background: #222; font-weight: bold; }
 
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    /* STATUS BAR */
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
     
-    /* CONTROLS */
-    #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 80px; border-top: 1px solid #333; z-index: 1000;}
-    .main-btn { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; }
+    /* LIFTED CONTROLS */
+    #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
+    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     
-    .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
+    .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
@@ -64,20 +65,23 @@
     </div></div>
   </div>
 
-  <div id="status">Syncing Data...</div>
+  <div id="status">Syncing...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
-  <div id="controls">
-    <button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button>
-  </div>
+  <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
   <script>
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
     const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
-    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
+    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
+    let lastScannedWineText = "";
     let isLiveScanning = false;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbx-jJNpIQ8qv2GJJRzWutjyfMkpBMQVn2zOSHqNyVtYLKSn0KjZMFagy6E4VfSoOrT2/exec";
+    // SPATIAL BUFFER
+    let persistentMatches = [];
+    const DECAY_TIME = 4500; // Items stay for 4.5 seconds
+
+    const GAS_URL = "https://script.google.com/macros/s/AKfycb-jJNpIQ8qv2GJJRzWutjyfMkpBMQVn2zOSHqNyVtYLKSn0KjZMFagy6E4VfSoOrT2/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -85,14 +89,11 @@
       document.getElementById('menu-nav').style.display = 'flex';
       startOverBtn.style.display = 'block';
       
-      if (mode === 'Scan Menu') {
-        actionBtn.innerText = "START LIVE SCAN";
-      } else if (mode === 'Scan Wine List') {
-        actionBtn.innerText = "CAPTURE WINE LIST";
-      }
+      actionBtn.innerText = (mode === 'Scan Menu') ? "START LIVE SCAN" : "CAPTURE WINE LIST";
       
       initCamera();
       loadSheetData();
+      requestAnimationFrame(renderLoop); // Start the 60fps drawing engine
     }
 
     async function initCamera() {
@@ -120,6 +121,7 @@
       rawSheetData.slice(1).forEach(row => { if (row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
       status.innerText = `${res} Active`;
+      persistentMatches = []; // Reset screen on restaurant change
     }
 
     function setMode(mode, el) {
@@ -127,6 +129,7 @@
       document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active'));
       el.classList.add('active');
       document.getElementById('modeMenu').style.display = 'none';
+      persistentMatches = []; // Force refresh overlays with new logic
     }
 
     async function handleAction() {
@@ -135,17 +138,13 @@
     }
 
     async function captureWineList() {
-      status.innerHTML = '<div class="spinner"></div> Processing Wine Memory...';
+      status.innerHTML = '<div class="spinner"></div> Storing Wine List...';
       canvas.width = 1000; canvas.height = video.videoHeight * (1000 / video.videoWidth);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64 = canvas.toDataURL('image/jpeg', 0.7);
       const result = await worker.recognize(canvas);
       lastScannedWineText = clean(result.data.text);
-      
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) });
-      
       status.innerText = "Wine List Stored!";
-      alert("Wine List Saved! App now switching to Step 2: Live Menu Scan.");
+      alert("Wine List Saved! Switch to Step 2: Live Menu Scan.");
       appMode = 'Scan Menu';
       actionBtn.innerText = "START LIVE SCAN";
     }
@@ -155,75 +154,118 @@
       actionBtn.innerText = isLiveScanning ? "STOP SCAN" : "START LIVE SCAN";
       actionBtn.style.background = isLiveScanning ? "#f44336" : "#34C759";
       if (isLiveScanning) runAutoScan();
-      else ctx.clearRect(0,0, canvas.width, canvas.height);
     }
 
     async function runAutoScan() {
       if (!isLiveScanning) return;
-
-      status.innerHTML = '<div class="spinner"></div> Live Scanning...';
       
-      // Hidden snapshot for OCR
-      canvas.width = 800; canvas.height = video.videoHeight * (800 / video.videoWidth);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Perform OCR on a low-res hidden canvas for speed
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 640; 
+      offscreen.height = video.videoHeight * (640 / video.videoWidth);
+      offscreen.getContext('2d').drawImage(video, 0, 0, offscreen.width, offscreen.height);
       
       try {
-        const result = await worker.recognize(canvas);
-        processLines(result.data.lines);
-      } catch (e) { console.error(e); }
+        const result = await worker.recognize(offscreen);
+        updateBuffer(result.data.lines, offscreen.width, offscreen.height);
+      } catch (e) {}
 
-      // Repeat loop
-      if (isLiveScanning) setTimeout(runAutoScan, 500);
+      if (isLiveScanning) setTimeout(runAutoScan, 400); // OCR loop frequency
     }
 
-    function processLines(lines) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let matches = 0;
-      
+    function updateBuffer(lines, scanW, scanH) {
+      const now = Date.now();
+      const scaleX = canvas.width / scanW;
+      const scaleY = canvas.height / scanH;
+
       lines.forEach(line => {
-        const txt = clean(line.text);
-        if (txt.length < 4) return;
-        
-        Object.keys(activeMenu).forEach(key => { 
-          if (txt.includes(key) && key.length > 4) {
+        const scanText = clean(line.text);
+        if (scanText.length < 4) return;
+
+        Object.keys(activeMenu).forEach(key => {
+          if (scanText.includes(key) && key.length > 4) {
             const wineRows = activeMenu[key];
-            
-            // Get recommendation based on current mode
-            let rec = "";
             const row = wineRows[0];
+            
+            // Context check: Is the recommended wine on the physical wine list?
+            let rec = "";
             if (currentMode === "somm") rec = row[3];
-            else if (currentMode === "ai") rec = row[4]; // Simplification for live
+            else if (currentMode === "ai") rec = row[4];
             else if (currentMode === "expert") rec = row[7];
             else if (currentMode === "basic") rec = row[10];
 
             if (lastScannedWineText === "" || lastScannedWineText.includes(clean(rec))) {
-                drawOverlay(line.bbox, row[1], wineRows);
-                matches++;
+              const scaledBbox = {
+                x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY,
+                x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY
+              };
+              
+              const existingIdx = persistentMatches.findIndex(m => m.itemName === key);
+              if (existingIdx > -1) {
+                persistentMatches[existingIdx].bbox = scaledBbox;
+                persistentMatches[existingIdx].lastSeen = now;
+              } else {
+                persistentMatches.push({ itemName: row[1], bbox: scaledBbox, rows: wineRows, lastSeen: now });
+              }
             }
-          } 
+          }
         });
       });
-      status.innerText = matches > 0 ? `Matched ${matches} Pairs` : "Scanning...";
     }
 
-    function drawOverlay(bbox, name, rows) {
-        const fontSize = 14, lineHeight = 20, padding = 10;
+    function renderLoop() {
+      if (!isLiveScanning && persistentMatches.length === 0) {
+        requestAnimationFrame(renderLoop);
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (canvas.width !== video.videoWidth) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+      }
+
+      const now = Date.now();
+      persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
+
+      persistentMatches.forEach(match => {
+        const age = now - match.lastSeen;
+        const opacity = age > (DECAY_TIME - 1000) ? (DECAY_TIME - age) / 1000 : 1;
+        drawOverlay(match.bbox, match.itemName, match.rows, opacity);
+      });
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawOverlay(bbox, name, rows, opacity) {
+        const fontSize = 14, lineHeight = 20, padding = 15;
         let displayTexts = [];
         const rowsToProcess = (currentMode === "somm") ? rows : [rows[0]];
-        rowsToProcess.forEach(row => {
-          if (currentMode === "somm") displayTexts.push(row[3]);
-          if (currentMode === "ai") { displayTexts.push(row[4]); displayTexts.push(row[5]); }
-          if (currentMode === "expert") { displayTexts.push(row[7]); displayTexts.push(row[8]); displayTexts.push(row[9]); }
-          if (currentMode === "basic") { displayTexts.push(row[10]); displayTexts.push(row[11]); displayTexts.push(row[12]); }
-        });
-        displayTexts = displayTexts.filter(t => t);
         
-        const totalH = (displayTexts.length + 1) * lineHeight + (padding * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, 260, totalH, 10); ctx.fill();
-        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
-        ctx.fillStyle = "white"; ctx.font = "12px Arial";
-        displayTexts.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))));
+        rowsToProcess.forEach(row => {
+          if (currentMode === "somm" && row[3]) displayTexts.push(row[3]);
+          if (currentMode === "ai") { if(row[4]) displayTexts.push(row[4]); if(row[5]) displayTexts.push(row[5]); }
+          if (currentMode === "expert") { if(row[7]) displayTexts.push(row[7]); if(row[8]) displayTexts.push(row[8]); if(row[9]) displayTexts.push(row[9]); }
+          if (currentMode === "basic") { if(row[10]) displayTexts.push(row[10]); if(row[11]) displayTexts.push(row[11]); if(row[12]) displayTexts.push(row[12]); }
+        });
+
+        displayTexts = displayTexts.filter(t => t);
+        if (displayTexts.length === 0) return;
+
+        ctx.font = `bold ${fontSize}px Arial`;
+        const title = name.toUpperCase();
+        let maxW = ctx.measureText(title).width;
+        ctx.font = `${fontSize - 2}px Arial`;
+        displayTexts.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
+        const boxWidth = maxW + (padding * 2), totalH = (displayTexts.length + 1) * lineHeight + (padding * 2);
+
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
+        ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
+        displayTexts.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+        ctx.globalAlpha = 1.0;
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
