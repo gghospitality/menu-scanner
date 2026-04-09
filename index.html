@@ -52,14 +52,9 @@
     </div></div>
   </div>
 
-  <div id="status">Ready</div>
-  <div id="container">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="overlay"></canvas>
-  </div>
-  <div id="controls">
-    <button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button>
-  </div>
+  <div id="status">Syncing Data...</div>
+  <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
+  <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
   <script>
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
@@ -67,7 +62,7 @@
     
     let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
     let isLiveScanning = false, persistentMatches = [];
-    const DECAY_TIME = 4500;
+    const DECAY_TIME = 6000; // Overlays stay for 6 seconds
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbx-jJNpIQ8qv2GJJRzWutjyfMkpBMQVn2zOSHqNyVtYLKSn0KjZMFagy6E4VfSoOrT2/exec";
 
@@ -104,7 +99,7 @@
     function populateRestaurants() {
       const resContainer = document.getElementById('resMenu');
       const restaurants = [...new Set(rawSheetData.slice(1).map(row => row[0]))].filter(r => r).sort();
-      let html = `<div class="menu-item active" onclick="setRestaurant('GLOBAL', this)">🌎 Search Entire Database</div>`;
+      let html = `<div class="menu-item active" onclick="setRestaurant('GLOBAL', this)">🌎 Entire Expert Database</div>`;
       html += restaurants.map(r => `<div class="menu-item" onclick="setRestaurant('${r.replace(/'/g, "\\'")}', this)">${r}</div>`).join('');
       resContainer.innerHTML = html;
       setRestaurant('GLOBAL', resContainer.firstChild); 
@@ -122,7 +117,7 @@
         } 
       });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = (res === 'GLOBAL') ? "Database: Global" : `Menu: ${res}`;
+      status.innerText = (res === 'GLOBAL') ? "Database: All Pairings" : `Menu: ${res}`;
       persistentMatches = [];
     }
 
@@ -141,20 +136,22 @@
 
     async function captureWineList() {
       if (!worker) return;
-      status.innerHTML = '<div class="spinner"></div> Storing Wine Memory...';
+      status.innerHTML = '<div class="spinner"></div> Indexing Wine List...';
       const off = document.createElement('canvas');
-      off.width = 1000; off.height = video.videoHeight * (1000 / video.videoWidth);
-      off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      const result = await worker.recognize(off);
+      off.width = 1500; // Max resolution for stylized lists like Via Carota
+      off.height = video.videoHeight * (1500 / video.videoWidth);
+      const octx = off.getContext('2d');
+      // Sharpen image for better OCR
+      octx.filter = "contrast(1.4) grayscale(1)";
+      octx.drawImage(video, 0, 0, off.width, off.height);
       
-      // Store all words seen to make matching easier
+      const result = await worker.recognize(off);
       lastScannedWineText = clean(result.data.text);
-      console.log("Wines seen:", lastScannedWineText);
+      
+      console.log("WINE LIST OCR OUTPUT:", lastScannedWineText);
 
       const base64 = off.toDataURL('image/jpeg', 0.6);
       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) });
-      
-      status.innerText = "Wine List Saved!";
       alert("Wine List Saved! Switch to Step 2 to scan the Food Menu.");
       appMode = 'Scan Menu';
       actionBtn.innerText = "START LIVE SCAN";
@@ -170,32 +167,29 @@
 
     async function runAutoScan() {
       if (!isLiveScanning || !worker) return;
-      const off = document.createElement('canvas'); 
-      off.width = 800; // Increased resolution for better OCR
-      off.height = video.videoHeight * (800 / video.videoWidth);
+      const off = document.createElement('canvas'); off.width = 800; off.height = video.videoHeight * (800 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      
-      try { 
-        const result = await worker.recognize(off); 
-        updateBuffer(result.data.lines, off.width, off.height); 
-      } catch (e) {}
-      
+      try { const result = await worker.recognize(off); updateBuffer(result.data.lines, off.width, off.height); } catch (e) {}
       if (isLiveScanning) setTimeout(runAutoScan, 500);
     }
 
-    // --- LENIENT MATCHING LOGIC ---
-    function isWineInMemory(recommendation) {
-        if (!lastScannedWineText) return true; // Show all if no list scanned yet
+    // --- SMART INTERSECTION LOGIC ---
+    function checkWineInList(wineName) {
+        if (!lastScannedWineText || !wineName) return false;
+        const cleanWine = clean(wineName);
         
-        const cleanRec = clean(recommendation);
-        if (cleanRec.length < 3) return false;
+        // Break recommendation into keywords (ignore years and short words)
+        const tokens = cleanWine.split(' ').filter(t => t.length > 3 && isNaN(t));
+        
+        // If the wine list contains the 2 longest tokens, it's likely a match
+        const sortedTokens = tokens.sort((a,b) => b.length - a.length);
+        const key1 = sortedTokens[0];
+        const key2 = sortedTokens[1];
 
-        // Split the wine recommendation into individual words
-        // If the wine list contains the most important word (longer than 4 chars), it's a match
-        const words = cleanRec.split(' ').filter(w => w.length > 4);
-        if (words.length === 0) return lastScannedWineText.includes(cleanRec);
+        if (!key1) return false;
+        if (!key2) return lastScannedWineText.includes(key1);
         
-        return words.some(word => lastScannedWineText.includes(word));
+        return lastScannedWineText.includes(key1) && lastScannedWineText.includes(key2);
     }
 
     function updateBuffer(lines, scanW, scanH) {
@@ -203,24 +197,31 @@
       lines.forEach(line => {
         const scanText = clean(line.text);
         if (scanText.length < 4) return;
-
         Object.keys(activeMenu).forEach(foodKey => {
-          if (scanText.includes(foodKey) && foodKey.length > 4) {
-            const wineRows = activeMenu[foodKey];
+          if (scanText.includes(foodKey) && foodKey.length > 3) {
+            const pairingRows = activeMenu[foodKey];
             
-            // Check current logic rule
-            let wineRec = "";
-            if (currentMode === "somm") wineRec = wineRows[0][3];
-            else if (currentMode === "ai") wineRec = wineRows[0][4];
-            else if (currentMode === "expert") wineRec = wineRows[0][7];
-            else if (currentMode === "basic") wineRec = wineRows[0][10];
+            pairingRows.forEach(row => {
+              let wines = [];
+              if (currentMode === "somm") wines = [row[3]];
+              else if (currentMode === "ai") wines = [row[4], row[5]];
+              else if (currentMode === "expert") wines = [row[7], row[8], row[9]];
+              else if (currentMode === "basic") wines = [row[10], row[11], row[12]];
 
-            if (isWineInMemory(wineRec)) {
-              const scaledBbox = { x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY, x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY };
-              const idx = persistentMatches.findIndex(m => m.itemName === foodKey);
-              if (idx > -1) { persistentMatches[idx].bbox = scaledBbox; persistentMatches[idx].lastSeen = now; }
-              else { persistentMatches.push({ itemName: wineRows[0][1], bbox: scaledBbox, rows: wineRows, lastSeen: now }); }
-            }
+              const validWines = wines.filter(w => checkWineInList(w));
+
+              if (validWines.length > 0) {
+                const scaledBbox = { x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY, x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY };
+                const idx = persistentMatches.findIndex(m => m.itemName === foodKey);
+                if (idx > -1) { 
+                    persistentMatches[idx].bbox = scaledBbox; 
+                    persistentMatches[idx].lastSeen = now; 
+                    persistentMatches[idx].displayData = validWines;
+                } else { 
+                    persistentMatches.push({ itemName: row[1], bbox: scaledBbox, displayData: validWines, lastSeen: now }); 
+                }
+              }
+            });
           }
         });
       });
@@ -235,42 +236,31 @@
           persistentMatches.forEach(match => {
             const age = now - match.lastSeen;
             const opacity = age > (DECAY_TIME - 1000) ? (DECAY_TIME - age) / 1000 : 1;
-            drawOverlay(match.bbox, match.itemName, match.rows, opacity);
+            drawOverlay(match.bbox, match.itemName, match.displayData, opacity);
           });
       }
       requestAnimationFrame(renderLoop);
     }
 
-    function drawOverlay(bbox, name, rows, opacity) {
+    function drawOverlay(bbox, name, infoList, opacity) {
         const fontSize = 14, lineHeight = 20, padding = 15;
-        let displayTexts = [];
-        const rowsToProcess = (currentMode === "somm") ? rows : [rows[0]];
-        rowsToProcess.forEach(row => {
-          if (currentMode === "somm") displayTexts.push(row[3]);
-          if (currentMode === "ai") { displayTexts.push(row[4]); displayTexts.push(row[5]); }
-          if (currentMode === "expert") { displayTexts.push(row[7]); displayTexts.push(row[8]); displayTexts.push(row[9]); }
-          if (currentMode === "basic") { displayTexts.push(row[10]); displayTexts.push(row[11]); displayTexts.push(row[12]); }
-        });
-        displayTexts = displayTexts.filter(t => t);
-        if (displayTexts.length === 0) return;
         ctx.font = `bold ${fontSize}px Arial`;
         const title = name.toUpperCase();
         let maxW = ctx.measureText(title).width;
         ctx.font = `${fontSize - 2}px Arial`;
-        displayTexts.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
-        const boxWidth = maxW + (padding * 2), totalH = (displayTexts.length + 1) * lineHeight + (padding * 2);
+        infoList.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
+        const boxWidth = maxW + (padding * 2), totalH = (infoList.length + 1) * lineHeight + (padding * 2);
         ctx.globalAlpha = opacity;
         ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
         ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
-        displayTexts.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
+        infoList.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
         ctx.globalAlpha = 1.0;
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
     function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
-    function setMode(mode, el) { currentMode = mode; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active')); el.classList.add('active'); toggleMenu('modeMenu'); }
   </script>
 </body>
 </html>
