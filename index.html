@@ -18,9 +18,12 @@
 
     /* UI LAYOUT */
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
-    video { width: 100%; height: 100%; object-fit: cover; }
+    video { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     
+    /* RESET BUTTON */
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.2); border: 1px solid #fff; color: white; padding: 5px 15px; border-radius: 15px; font-size: 12px; z-index: 5000; display: none; }
+
     /* MENUS */
     #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
     .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
@@ -28,13 +31,11 @@
     .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
     .menu-item.active { border-left: 5px solid #34C759; background: #222; font-weight: bold; }
 
-    #status { position: fixed; top: 55px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
     
-    /* LIFTED CONTROLS */
-    #controls { min-height: 220px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; gap: 10px; border-top: 1px solid #333; }
-    .main-btn { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; transition: 0.2s; }
-    #actionBtn { background: #34C759; color: white; }
-    #rescanBtn { background: #444; color: white; display: none; }
+    /* CONTROLS */
+    #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 80px; border-top: 1px solid #333; z-index: 1000;}
+    .main-btn { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; }
     
     .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -42,11 +43,13 @@
 </head>
 <body>
 
+  <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
+
   <div id="splash-screen">
     <div id="splash-buttons">
-        <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">Step 2: Scan Menu</button>
+        <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">Step 2: Live Menu Scan</button>
         <button class="splash-btn btn-blue" onclick="startFlow('Scan Wine List')">Step 1: Scan Wine List</button>
-        <button class="splash-btn btn-green" onclick="startFlow('Menu List')">Menu List Database</button>
+        <button class="splash-btn btn-green" onclick="startFlow('Menu List')">Database Search</button>
     </div>
     <img src="logo.png" alt="Sommurai Logo">
   </div>
@@ -61,19 +64,18 @@
     </div></div>
   </div>
 
-  <div id="status">Waking up...</div>
+  <div id="status">Syncing Data...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls">
     <button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button>
-    <button id="rescanBtn" class="main-btn" onclick="resetUI()">RESCAN MENU</button>
   </div>
 
   <script>
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
-    const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), rescanBtn = document.getElementById('rescanBtn');
+    const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
     let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
-    let lastOCRResult = null; // Stores last menu scan for instant mode switching
+    let isLiveScanning = false;
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbx-jJNpIQ8qv2GJJRzWutjyfMkpBMQVn2zOSHqNyVtYLKSn0KjZMFagy6E4VfSoOrT2/exec";
 
@@ -81,13 +83,12 @@
       appMode = mode;
       document.getElementById('splash-screen').style.display = 'none';
       document.getElementById('menu-nav').style.display = 'flex';
+      startOverBtn.style.display = 'block';
       
       if (mode === 'Scan Menu') {
-        actionBtn.innerText = "SCAN FOOD MENU";
+        actionBtn.innerText = "START LIVE SCAN";
       } else if (mode === 'Scan Wine List') {
         actionBtn.innerText = "CAPTURE WINE LIST";
-      } else {
-        actionBtn.innerText = "SEARCH DATABASE";
       }
       
       initCamera();
@@ -97,8 +98,8 @@
     async function initCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } }, audio: false });
       video.srcObject = stream;
-      status.innerText = "Camera Ready";
       worker = await Tesseract.createWorker('eng');
+      status.innerText = "Ready";
     }
 
     async function loadSheetData() {
@@ -119,7 +120,6 @@
       rawSheetData.slice(1).forEach(row => { if (row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
       status.innerText = `${res} Active`;
-      if (lastOCRResult) processLines(lastOCRResult.lines); // Re-run overlays if sheet data changes
     }
 
     function setMode(mode, el) {
@@ -127,67 +127,83 @@
       document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active'));
       el.classList.add('active');
       document.getElementById('modeMenu').style.display = 'none';
-      if (lastOCRResult) processLines(lastOCRResult.lines); // Re-run overlays instantly when mode changes
     }
 
     async function handleAction() {
-      if (appMode === 'Scan Wine List') captureAndUpload();
-      else takeSnapshot();
+      if (appMode === 'Scan Wine List') captureWineList();
+      else toggleLiveScan();
     }
 
-    async function captureAndUpload() {
-      status.innerHTML = '<div class="spinner"></div> Storing Wine List...';
+    async function captureWineList() {
+      status.innerHTML = '<div class="spinner"></div> Processing Wine Memory...';
       canvas.width = 1000; canvas.height = video.videoHeight * (1000 / video.videoWidth);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const base64 = canvas.toDataURL('image/jpeg', 0.7);
       const result = await worker.recognize(canvas);
-      
       lastScannedWineText = clean(result.data.text);
       
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) })
-      .then(() => {
-        status.innerText = "Wine List Stored!";
-        alert("Wine List Saved! Now switch to 'Scan Food Menu' mode.");
-        appMode = 'Scan Menu';
-        actionBtn.innerText = "SCAN FOOD MENU";
-      });
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) });
+      
+      status.innerText = "Wine List Stored!";
+      alert("Wine List Saved! App now switching to Step 2: Live Menu Scan.");
+      appMode = 'Scan Menu';
+      actionBtn.innerText = "START LIVE SCAN";
     }
 
-    async function takeSnapshot() {
-      status.innerHTML = '<div class="spinner"></div> Analyzing...';
-      canvas.width = 1200; canvas.height = video.videoHeight * (1200 / video.videoWidth);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      video.style.opacity = "0.2"; 
-      actionBtn.style.display = "none";
-      rescanBtn.style.display = "block";
+    function toggleLiveScan() {
+      isLiveScanning = !isLiveScanning;
+      actionBtn.innerText = isLiveScanning ? "STOP SCAN" : "START LIVE SCAN";
+      actionBtn.style.background = isLiveScanning ? "#f44336" : "#34C759";
+      if (isLiveScanning) runAutoScan();
+      else ctx.clearRect(0,0, canvas.width, canvas.height);
+    }
+
+    async function runAutoScan() {
+      if (!isLiveScanning) return;
+
+      status.innerHTML = '<div class="spinner"></div> Live Scanning...';
       
-      const result = await worker.recognize(canvas);
-      lastOCRResult = result.data; // Save result so we can switch modes instantly
-      processLines(result.data.lines);
+      // Hidden snapshot for OCR
+      canvas.width = 800; canvas.height = video.videoHeight * (800 / video.videoWidth);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      try {
+        const result = await worker.recognize(canvas);
+        processLines(result.data.lines);
+      } catch (e) { console.error(e); }
+
+      // Repeat loop
+      if (isLiveScanning) setTimeout(runAutoScan, 500);
     }
 
     function processLines(lines) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       let matches = 0;
+      
       lines.forEach(line => {
         const txt = clean(line.text);
         if (txt.length < 4) return;
+        
         Object.keys(activeMenu).forEach(key => { 
           if (txt.includes(key) && key.length > 4) {
             const wineRows = activeMenu[key];
             
-            // LOGIC: Check if the wine for the current mode exists in our scanned Wine List
-            // Note: This logic assumes Column D contains the wine name. 
-            const wineRecommendation = clean(wineRows[0][3]); 
-            
-            if (lastScannedWineText === "" || lastScannedWineText.includes(wineRecommendation)) {
-                drawOverlay(line.bbox, wineRows[0][1], wineRows);
+            // Get recommendation based on current mode
+            let rec = "";
+            const row = wineRows[0];
+            if (currentMode === "somm") rec = row[3];
+            else if (currentMode === "ai") rec = row[4]; // Simplification for live
+            else if (currentMode === "expert") rec = row[7];
+            else if (currentMode === "basic") rec = row[10];
+
+            if (lastScannedWineText === "" || lastScannedWineText.includes(clean(rec))) {
+                drawOverlay(line.bbox, row[1], wineRows);
                 matches++;
             }
           } 
         });
       });
-      status.innerText = matches > 0 ? `Matched ${matches} Pairings` : "No matches found on list.";
+      status.innerText = matches > 0 ? `Matched ${matches} Pairs` : "Scanning...";
     }
 
     function drawOverlay(bbox, name, rows) {
@@ -201,21 +217,13 @@
           if (currentMode === "basic") { displayTexts.push(row[10]); displayTexts.push(row[11]); displayTexts.push(row[12]); }
         });
         displayTexts = displayTexts.filter(t => t);
+        
         const totalH = (displayTexts.length + 1) * lineHeight + (padding * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 10, 300, totalH, 10); ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, 260, totalH, 10); ctx.fill();
         ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = "12px Arial";
         displayTexts.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))));
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-    }
-
-    function resetUI() {
-      video.style.opacity = "1";
-      actionBtn.style.display = "block";
-      rescanBtn.style.display = "none";
-      lastOCRResult = null;
-      status.innerText = "Ready to Scan";
-      ctx.clearRect(0,0, canvas.width, canvas.height);
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
