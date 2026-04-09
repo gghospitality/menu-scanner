@@ -22,7 +22,7 @@
     .menu-content { position: absolute; left: 60px; top: 0; background: rgba(25, 25, 25, 0.98); border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
     .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
     .menu-item.active { border-left: 5px solid #34C759; background: #222; font-weight: bold; }
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
     #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
     .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; }
     .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
@@ -62,7 +62,7 @@
     
     let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
     let isLiveScanning = false, persistentMatches = [];
-    const DECAY_TIME = 6000; // Overlays stay for 6 seconds
+    const DECAY_TIME = 6000;
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbx-jJNpIQ8qv2GJJRzWutjyfMkpBMQVn2zOSHqNyVtYLKSn0KjZMFagy6E4VfSoOrT2/exec";
 
@@ -88,7 +88,18 @@
       } catch (e) { alert("Camera Blocked."); return false; }
     }
 
-    async function initAI() { if (!worker) { worker = await Tesseract.createWorker('eng'); status.innerText = "AI Ready"; } }
+    async function initAI() {
+      if (worker) return;
+      // Initialize with progress logging
+      worker = await Tesseract.createWorker('eng', 1, {
+        logger: m => {
+          if (m.status === 'recognizing') {
+            status.innerText = `Indexing: ${Math.round(m.progress * 100)}%`;
+          }
+        }
+      });
+      status.innerText = "AI Ready";
+    }
 
     async function loadSheetData() {
       const resp = await fetch(GAS_URL, { redirect: 'follow' });
@@ -135,26 +146,33 @@
     }
 
     async function captureWineList() {
-      if (!worker) return;
+      if (!worker) { alert("AI engine is still waking up..."); return; }
+      
       status.innerHTML = '<div class="spinner"></div> Indexing Wine List...';
+      
       const off = document.createElement('canvas');
-      off.width = 1500; // Max resolution for stylized lists like Via Carota
-      off.height = video.videoHeight * (1500 / video.videoWidth);
+      off.width = 1200; // Optimized resolution
+      off.height = video.videoHeight * (1200 / video.videoWidth);
       const octx = off.getContext('2d');
-      // Sharpen image for better OCR
       octx.filter = "contrast(1.4) grayscale(1)";
       octx.drawImage(video, 0, 0, off.width, off.height);
       
-      const result = await worker.recognize(off);
-      lastScannedWineText = clean(result.data.text);
-      
-      console.log("WINE LIST OCR OUTPUT:", lastScannedWineText);
-
-      const base64 = off.toDataURL('image/jpeg', 0.6);
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) });
-      alert("Wine List Saved! Switch to Step 2 to scan the Food Menu.");
-      appMode = 'Scan Menu';
-      actionBtn.innerText = "START LIVE SCAN";
+      try {
+        const result = await worker.recognize(off);
+        lastScannedWineText = clean(result.data.text);
+        
+        // Background Upload
+        const base64 = off.toDataURL('image/jpeg', 0.6);
+        fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) });
+        
+        status.innerText = "Wine List Saved!";
+        alert("Success! Now switch to Step 2 to scan the Food Menu.");
+        appMode = 'Scan Menu';
+        actionBtn.innerText = "START LIVE SCAN";
+      } catch (e) {
+        status.innerText = "Error Indexing";
+        alert("Memory Error. Please refresh and try again.");
+      }
     }
 
     function toggleLiveScan() {
@@ -173,23 +191,14 @@
       if (isLiveScanning) setTimeout(runAutoScan, 500);
     }
 
-    // --- SMART INTERSECTION LOGIC ---
     function checkWineInList(wineName) {
         if (!lastScannedWineText || !wineName) return false;
         const cleanWine = clean(wineName);
-        
-        // Break recommendation into keywords (ignore years and short words)
         const tokens = cleanWine.split(' ').filter(t => t.length > 3 && isNaN(t));
-        
-        // If the wine list contains the 2 longest tokens, it's likely a match
-        const sortedTokens = tokens.sort((a,b) => b.length - a.length);
-        const key1 = sortedTokens[0];
-        const key2 = sortedTokens[1];
-
-        if (!key1) return false;
-        if (!key2) return lastScannedWineText.includes(key1);
-        
-        return lastScannedWineText.includes(key1) && lastScannedWineText.includes(key2);
+        const sorted = tokens.sort((a,b) => b.length - a.length);
+        if (!sorted[0]) return false;
+        if (!sorted[1]) return lastScannedWineText.includes(sorted[0]);
+        return lastScannedWineText.includes(sorted[0]) && lastScannedWineText.includes(sorted[1]);
     }
 
     function updateBuffer(lines, scanW, scanH) {
@@ -200,7 +209,6 @@
         Object.keys(activeMenu).forEach(foodKey => {
           if (scanText.includes(foodKey) && foodKey.length > 3) {
             const pairingRows = activeMenu[foodKey];
-            
             pairingRows.forEach(row => {
               let wines = [];
               if (currentMode === "somm") wines = [row[3]];
@@ -213,13 +221,8 @@
               if (validWines.length > 0) {
                 const scaledBbox = { x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY, x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY };
                 const idx = persistentMatches.findIndex(m => m.itemName === foodKey);
-                if (idx > -1) { 
-                    persistentMatches[idx].bbox = scaledBbox; 
-                    persistentMatches[idx].lastSeen = now; 
-                    persistentMatches[idx].displayData = validWines;
-                } else { 
-                    persistentMatches.push({ itemName: row[1], bbox: scaledBbox, displayData: validWines, lastSeen: now }); 
-                }
+                if (idx > -1) { persistentMatches[idx].bbox = scaledBbox; persistentMatches[idx].lastSeen = now; persistentMatches[idx].displayData = validWines; }
+                else { persistentMatches.push({ itemName: row[1], bbox: scaledBbox, displayData: validWines, lastSeen: now }); }
               }
             });
           }
@@ -254,7 +257,8 @@
         ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
         ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
-        infoList.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
+        displayTexts = [...new Set(infoList)]; // Unique values
+        displayTexts.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
         ctx.globalAlpha = 1.0;
     }
