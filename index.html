@@ -7,24 +7,36 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
+    
+    /* SPLASH SCREEN */
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
-    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; }
     .btn-blue { background: #002d58; }
     .btn-green { background: #34C759; }
     #splash-screen img { width: 70%; max-width: 300px; }
+
+    /* UI LAYOUT */
     #container { position: relative; flex-grow: 1; background: #111; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+    
+    /* MENUS */
     #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
-    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; }
+    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
     .menu-content { position: absolute; left: 60px; top: 0; background: rgba(25,25,25,0.98); border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
     .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
     .menu-item.active { border-left: 5px solid #34C759; background: #222; font-weight: bold; }
-    #status { position: fixed; top: 55px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 13px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
-    #controls { min-height: 200px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 125px; border-top: 1px solid #333; }
-    #mainBtn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
+
+    #status { position: fixed; top: 55px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    
+    /* LIFTED CONTROLS */
+    #controls { min-height: 220px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; gap: 10px; border-top: 1px solid #333; }
+    .main-btn { padding: 18px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; transition: 0.2s; }
+    #actionBtn { background: #34C759; color: white; }
+    #rescanBtn { background: #444; color: white; display: none; }
+    
+    .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
@@ -32,16 +44,16 @@
 
   <div id="splash-screen">
     <div id="splash-buttons">
-        <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">Scan Menu (Step 2)</button>
-        <button class="splash-btn btn-blue" onclick="startFlow('Scan Wine List')">Scan Wine List (Step 1)</button>
-        <button class="splash-btn btn-green" onclick="startFlow('Menu List')">Somm Search</button>
+        <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">Step 2: Scan Menu</button>
+        <button class="splash-btn btn-blue" onclick="startFlow('Scan Wine List')">Step 1: Scan Wine List</button>
+        <button class="splash-btn btn-green" onclick="startFlow('Menu List')">Menu List Database</button>
     </div>
     <img src="logo.png" alt="Sommurai Logo">
   </div>
 
   <div id="menu-nav">
     <div class="menu-group"><div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div><div id="resMenu" class="menu-content"></div></div>
-    <div class="menu-group" id="logic-trigger" style="display:none;"><div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div><div id="modeMenu" class="menu-content">
+    <div class="menu-group" id="logic-trigger"><div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div><div id="modeMenu" class="menu-content">
         <div class="menu-item active" onclick="setMode('somm', this)">Somm Pick (D)</div>
         <div class="menu-item" onclick="setMode('ai', this)">AI Somm Pick (E,F)</div>
         <div class="menu-item" onclick="setMode('expert', this)">Expert (H,I,J)</div>
@@ -49,26 +61,34 @@
     </div></div>
   </div>
 
-  <div id="status">Ready</div>
+  <div id="status">Waking up...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
-  <div id="controls"><button id="mainBtn" onclick="handleAction()">ACTION</button></div>
+  <div id="controls">
+    <button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button>
+    <button id="rescanBtn" class="main-btn" onclick="resetUI()">RESCAN MENU</button>
+  </div>
 
   <script>
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
-    const status = document.getElementById('status'), mainBtn = document.getElementById('mainBtn');
+    const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), rescanBtn = document.getElementById('rescanBtn');
+    
     let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
+    let lastOCRResult = null; // Stores last menu scan for instant mode switching
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbx-jJNpIQ8qv2GJJRzWutjyfMkpBMQVn2zOSHqNyVtYLKSn0KjZMFagy6E4VfSoOrT2/exec";
 
     async function startFlow(mode) {
       appMode = mode;
       document.getElementById('splash-screen').style.display = 'none';
-      if (mode === 'Menu List' || mode === 'Scan Menu') {
-        document.getElementById('menu-nav').style.display = 'flex';
-        document.getElementById('logic-trigger').style.display = 'block';
+      document.getElementById('menu-nav').style.display = 'flex';
+      
+      if (mode === 'Scan Menu') {
+        actionBtn.innerText = "SCAN FOOD MENU";
+      } else if (mode === 'Scan Wine List') {
+        actionBtn.innerText = "CAPTURE WINE LIST";
+      } else {
+        actionBtn.innerText = "SEARCH DATABASE";
       }
-      mainBtn.innerText = (mode === 'Scan Menu') ? "MATCH MENU TO WINE LIST" : "CAPTURE & UPLOAD";
-      if (mode === 'Menu List') mainBtn.innerText = "SCAN WINE LIST";
       
       initCamera();
       loadSheetData();
@@ -96,68 +116,53 @@
 
     function setRestaurant(res, el) {
       activeMenu = {};
-      rawSheetData.slice(1).forEach(row => { if (row[0] === res) { const wine = clean(row[1]); if (!activeMenu[wine]) activeMenu[wine] = []; activeMenu[wine].push(row); } });
+      rawSheetData.slice(1).forEach(row => { if (row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
       status.innerText = `${res} Active`;
+      if (lastOCRResult) processLines(lastOCRResult.lines); // Re-run overlays if sheet data changes
+    }
+
+    function setMode(mode, el) {
+      currentMode = mode;
+      document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('modeMenu').style.display = 'none';
+      if (lastOCRResult) processLines(lastOCRResult.lines); // Re-run overlays instantly when mode changes
     }
 
     async function handleAction() {
-      if (appMode === 'Scan Menu' || appMode === 'Menu List') takeSnapshot();
-      else captureAndUpload();
+      if (appMode === 'Scan Wine List') captureAndUpload();
+      else takeSnapshot();
     }
 
-    // --- OPTIMIZED CAPTURE & UPLOAD ---
     async function captureAndUpload() {
-      status.innerHTML = '<div class="spinner"></div> Optimizing Image...';
-      
-      // 1. Resize Image (Max width 1000px for speed)
-      const scale = 1000 / video.videoWidth;
-      canvas.width = 1000;
-      canvas.height = video.videoHeight * scale;
+      status.innerHTML = '<div class="spinner"></div> Storing Wine List...';
+      canvas.width = 1000; canvas.height = video.videoHeight * (1000 / video.videoWidth);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // 2. Compress to JPEG (0.7 quality is plenty for OCR and much smaller than PNG)
       const base64 = canvas.toDataURL('image/jpeg', 0.7);
-      
-      status.innerHTML = '<div class="spinner"></div> AI Analysis...';
       const result = await worker.recognize(canvas);
       
-      if (appMode === 'Scan Wine List') {
-          lastScannedWineText = clean(result.data.text);
-      }
-
-      status.innerHTML = '<div class="spinner"></div> Uploading...';
+      lastScannedWineText = clean(result.data.text);
       
-      fetch(GAS_URL, {
-        method: "POST",
-        body: JSON.stringify({ base64: base64, ocr: result.data.text, type: appMode })
-      })
-      .then(r => r.json())
-      .then(res => {
-        status.innerText = "Success!";
-        if (appMode === 'Scan Wine List') {
-            alert("Wine List Stored! Now Scan Food Menu.");
-            appMode = 'Scan Menu';
-            mainBtn.innerText = "MATCH MENU TO WINE LIST";
-            document.getElementById('logic-trigger').style.display = 'block';
-        }
-      })
-      .catch(e => {
-          status.innerText = "Upload Error";
-          alert("Upload failed. Ensure you have a good connection.");
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: result.data.text, type: 'Wine List' }) })
+      .then(() => {
+        status.innerText = "Wine List Stored!";
+        alert("Wine List Saved! Now switch to 'Scan Food Menu' mode.");
+        appMode = 'Scan Menu';
+        actionBtn.innerText = "SCAN FOOD MENU";
       });
     }
 
     async function takeSnapshot() {
       status.innerHTML = '<div class="spinner"></div> Analyzing...';
-      // Snapshot also downscales to 1200px for faster mobile OCR
-      const scale = 1200 / video.videoWidth;
-      canvas.width = 1200;
-      canvas.height = video.videoHeight * scale;
+      canvas.width = 1200; canvas.height = video.videoHeight * (1200 / video.videoWidth);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      video.style.opacity = "0.2"; 
+      actionBtn.style.display = "none";
+      rescanBtn.style.display = "block";
       
-      video.style.opacity = "0.3"; 
       const result = await worker.recognize(canvas);
+      lastOCRResult = result.data; // Save result so we can switch modes instantly
       processLines(result.data.lines);
     }
 
@@ -170,15 +175,19 @@
         Object.keys(activeMenu).forEach(key => { 
           if (txt.includes(key) && key.length > 4) {
             const wineRows = activeMenu[key];
-            const wineNameFromSheet = clean(wineRows[0][3]); 
-            if (lastScannedWineText === "" || lastScannedWineText.includes(wineNameFromSheet)) {
+            
+            // LOGIC: Check if the wine for the current mode exists in our scanned Wine List
+            // Note: This logic assumes Column D contains the wine name. 
+            const wineRecommendation = clean(wineRows[0][3]); 
+            
+            if (lastScannedWineText === "" || lastScannedWineText.includes(wineRecommendation)) {
                 drawOverlay(line.bbox, wineRows[0][1], wineRows);
                 matches++;
             }
           } 
         });
       });
-      status.innerText = matches > 0 ? `${matches} Matches` : "No matches found.";
+      status.innerText = matches > 0 ? `Matched ${matches} Pairings` : "No matches found on list.";
     }
 
     function drawOverlay(bbox, name, rows) {
@@ -193,16 +202,24 @@
         });
         displayTexts = displayTexts.filter(t => t);
         const totalH = (displayTexts.length + 1) * lineHeight + (padding * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.9)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 10, 280, totalH, 10); ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.roundRect(bbox.x0, bbox.y0 - totalH - 10, 300, totalH, 10); ctx.fill();
         ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = "12px Arial";
         displayTexts.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))));
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
     }
 
+    function resetUI() {
+      video.style.opacity = "1";
+      actionBtn.style.display = "block";
+      rescanBtn.style.display = "none";
+      lastOCRResult = null;
+      status.innerText = "Ready to Scan";
+      ctx.clearRect(0,0, canvas.width, canvas.height);
+    }
+
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
     function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
-    function setMode(mode, el) { currentMode = mode; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active')); el.classList.add('active'); toggleMenu('modeMenu'); }
   </script>
 </body>
 </html>
