@@ -286,4 +286,15 @@
 
     function isWineMatch(wineName) {
         if (!lastScannedWineText || !wineName) return false;
-        const c
+        const cleanRec = clean(wineName);
+        const tokens = cleanRec.split(' ').filter(t => t.length > 4 && isNaN(t));
+        if (tokens.length === 0) return lastScannedWineText.includes(cleanRec);
+        return tokens.filter(t => lastScannedWineText.includes(t)).length >= (tokens.length * 0.4);
+    }
+
+    function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
+    function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+    function setMode(mode, el) { currentMode = mode; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active')); el.classList.add('active'); toggleMenu('modeMenu'); persistentMatches = []; }
+  </script>
+</body>
+</html>
