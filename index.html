@@ -9,18 +9,18 @@
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
-    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; }
+    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
     #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: auto; z-index: 5; }
     #menu-nav { position: fixed; top: 55px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
     .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
-    .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
-    .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.8); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; color: #ccc; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
     #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
-    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; }
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 5px 15px; border-radius: 15px; font-size: 10px; z-index: 5000; display: none; }
+    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; transition: 0.2s; }
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 5px 15px; border-radius: 15px; font-size: 10px; z-index: 5000; display: none; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -45,7 +45,7 @@
     </div></div>
   </div>
 
-  <div id="status">Syncing...</div>
+  <div id="status">Syncing Data...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -53,11 +53,12 @@
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
     const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
-    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
-    let isScanning = false, persistentMatches = [], selectedItem = null;
+    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
+    let lastScannedWineText = "", isScanning = false, persistentMatches = [], selectedItem = null;
+    let currentRestaurant = "GLOBAL";
     const DECAY_TIME = 8000;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwr7e1wuPlLD5EDBVG7PQeNxa58aV2wGlL_LaLYjm8nO1lac8R3BXkEubFHm3J3xhRg/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzEyGgeClUx0DUfixxeYP5UFio93FT4UrblqPqHWHnHFJKFsNyx336xaimSfE5zgG1L/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -81,7 +82,7 @@
       } catch (e) { alert("Camera Error"); return false; }
     }
 
-    async function initAI() { worker = await Tesseract.createWorker('eng'); status.innerText = "Sommurai Ready"; }
+    async function initAI() { worker = await Tesseract.createWorker('eng'); status.innerText = "Sommurai Engine Active"; }
 
     async function loadSheetData() {
       const resp = await fetch(GAS_URL, { redirect: 'follow' });
@@ -92,15 +93,15 @@
     function populateRestaurants() {
       const resContainer = document.getElementById('resMenu');
       const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
-      resContainer.innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')">🌎 Global Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')">${r}</div>`).join('');
+      resContainer.innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')">🌎 Global Database</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')">${r}</div>`).join('');
       setRes('GLOBAL');
     }
 
     function setRes(res) {
-      activeMenu = {};
+      activeMenu = {}; currentRestaurant = res;
       rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = res + " Active";
+      status.innerText = res + " Brain Loaded";
     }
 
     function handleAction() {
@@ -113,9 +114,9 @@
     function updateUI() {
       if (appMode === 'Scan Wine List') {
         actionBtn.innerText = isScanning ? "FINISH WINE SCAN" : "START WINE INDEXING";
-        actionBtn.style.background = isScanning ? "#2196F3" : "#34C759";
+        actionBtn.style.background = isScanning ? "#2196F3" : "#002d58";
       } else {
-        actionBtn.innerText = isScanning ? "STOP LIVE SCAN" : "START LIVE MENU SCAN";
+        actionBtn.innerText = isScanning ? "STOP MENU SCAN" : "START LIVE MENU SCAN";
         actionBtn.style.background = isScanning ? "#f44336" : "#34C759";
       }
     }
@@ -127,20 +128,30 @@
       try {
         const result = await worker.recognize(off);
         if (appMode === 'Scan Wine List') {
-          result.data.lines.forEach(l => { if (clean(l.text).length > 8) lastScannedWineText += " " + clean(l.text); });
+            const now = Date.now();
+            result.data.lines.forEach(l => {
+                const txt = clean(l.text);
+                if (txt.length > 8) {
+                    lastScannedWineText += " " + txt;
+                    persistentMatches.push({ pos: { x: (l.bbox.x0+l.bbox.x1)/2 * (canvas.width/640), y: (l.bbox.y0+l.bbox.y1)/2 * (canvas.height/(640*video.videoHeight/video.videoWidth)) }, isWineLine: true, lastSeen: now });
+                }
+            });
         } else {
-          updateBuffer(result.data.lines, off.width, off.height);
+            updateBuffer(result.data.lines, off.width, off.height);
         }
       } catch (e) {}
-      setTimeout(runScan, 600);
+      if (isScanning) setTimeout(runScan, 600);
     }
 
     function finalizeWine() {
       isScanning = false;
       const off = document.createElement('canvas'); off.width = 1000; off.height = video.videoHeight * (1000 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: lastScannedWineText, type: 'Scan Wine List' }) });
-      appMode = 'Scan Menu'; updateUI();
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.6), ocr: lastScannedWineText, type: 'Scan Wine List', restaurant: currentRestaurant }) });
+      appMode = 'Scan Menu'; 
+      persistentMatches = [];
+      updateUI();
+      status.innerText = "Wine Cached. Ready for Menu.";
     }
 
     function updateBuffer(lines, sw, sh) {
@@ -150,12 +161,12 @@
         Object.keys(activeMenu).forEach(key => {
           if (txt.includes(key) && key.length > 4) {
             const rows = activeMenu[key];
-            const wines = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
+            let wines = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
             const valid = wines.filter(w => w && lastScannedWineText.includes(clean(w.split(' ')[0])));
             if (valid.length > 0) {
-              const idx = persistentMatches.findIndex(m => m.id === key);
+              const color = valid[0].toLowerCase().includes('red') ? '#ff4444' : valid[0].toLowerCase().includes('rose') ? '#ff80ab' : '#ffeb3b';
               const box = { x: (line.bbox.x0 + line.bbox.x1) / 2 * sx, y: (line.bbox.y0 + line.bbox.y1) / 2 * sy };
-              const color = valid[0].toLowerCase().includes('red') ? '#ff4444' : valid[0].toLowerCase().includes('rose') ? '#ff8888' : '#ffeb3b';
+              const idx = persistentMatches.findIndex(m => m.id === key);
               if (idx > -1) { persistentMatches[idx].pos = box; persistentMatches[idx].lastSeen = now; }
               else { persistentMatches.push({ id: key, name: rows[0][1], pos: box, data: valid, color: color, lastSeen: now }); }
             }
@@ -164,37 +175,31 @@
       });
     }
 
-    // --- CLICK DETECTION FOR DOTS ---
     canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
-        selectedItem = persistentMatches.find(m => Math.hypot(m.pos.x - x, m.pos.y - y) < 40) || null;
+        selectedItem = persistentMatches.find(m => !m.isWineLine && Math.hypot(m.pos.x - x, m.pos.y - y) < 50) || null;
     });
 
     function renderLoop() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-      
       const now = Date.now();
       persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
 
       persistentMatches.forEach(m => {
-        // Draw AR Dot
-        ctx.beginPath();
-        ctx.arc(m.pos.x, m.pos.y, 20, 0, Math.PI * 2);
-        ctx.fillStyle = m.color;
-        ctx.fill();
-        ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.stroke();
-
-        // If this dot was clicked, show pairings
-        if (selectedItem && selectedItem.id === m.id) {
-            const h = (m.data.length + 1) * 25 + 20;
-            ctx.fillStyle = "rgba(0,0,0,0.9)";
-            ctx.roundRect(m.pos.x + 30, m.pos.y - 50, 250, h, 10); ctx.fill();
-            ctx.fillStyle = m.color; ctx.font = "bold 16px Arial";
-            ctx.fillText(m.name.toUpperCase(), m.pos.x + 40, m.pos.y - 25);
-            ctx.fillStyle = "white"; ctx.font = "14px Arial";
-            m.data.forEach((txt, i) => ctx.fillText("• " + txt, m.pos.x + 40, m.pos.y + (i * 25)));
+        if (m.isWineLine) {
+            ctx.strokeStyle = "#34C759"; ctx.lineWidth = 2; ctx.strokeRect(m.pos.x-50, m.pos.y-10, 100, 20);
+        } else {
+            ctx.beginPath(); ctx.arc(m.pos.x, m.pos.y, 22, 0, Math.PI * 2);
+            ctx.fillStyle = m.color; ctx.fill(); ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.stroke();
+            if (selectedItem && selectedItem.id === m.id) {
+                ctx.fillStyle = "rgba(0,0,0,0.95)";
+                ctx.roundRect(m.pos.x + 30, m.pos.y - 60, 260, (m.data.length + 1) * 30 + 20, 15); ctx.fill();
+                ctx.fillStyle = m.color; ctx.font = "bold 16px Arial"; ctx.fillText(m.name.toUpperCase(), m.pos.x + 45, m.pos.y - 30);
+                ctx.fillStyle = "white"; ctx.font = "14px Arial";
+                m.data.forEach((txt, i) => ctx.fillText("• " + txt, m.pos.x + 45, m.pos.y + (i * 28)));
+            }
         }
       });
       requestAnimationFrame(renderLoop);
