@@ -36,7 +36,7 @@
   <div id="splash-screen">
     <div id="splash-buttons">
         <button class="splash-btn btn-blue" onclick="startFlow('Scan Wine List')">STEP 1: LIVE WINE INDEX</button>
-        <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">GO STRAIGHT TO SCAN MENU</button>
+        <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">SKIP TO FOOD SCAN</button>
         <button class="splash-btn btn-green" onclick="startFlow('Menu List')">DATABASE VIEW</button>
     </div>
     <img src="logo.png" alt="Sommurai Logo">
@@ -52,14 +52,9 @@
     </div></div>
   </div>
 
-  <div id="status">Ready</div>
-  <div id="container">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="overlay"></canvas>
-  </div>
-  <div id="controls">
-    <button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button>
-  </div>
+  <div id="status">Syncing Data...</div>
+  <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
+  <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
   <script>
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
@@ -98,7 +93,7 @@
     async function initAI() {
       if (worker) return;
       worker = await Tesseract.createWorker('eng', 1, {
-        logger: m => { if (m.status === 'recognizing') status.innerText = `Sommurai AI: ${Math.round(m.progress * 100)}%`; }
+        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Analyzing: ${Math.round(m.progress * 100)}%`; }
       });
       status.innerText = "Sommurai Ready";
     }
@@ -112,7 +107,7 @@
     function populateRestaurants() {
       const resContainer = document.getElementById('resMenu');
       const restaurants = [...new Set(rawSheetData.slice(1).map(row => row[0]))].filter(r => r).sort();
-      let html = `<div class="menu-item active" onclick="setRestaurant('GLOBAL', this)">🌎 GLOBAL EXPERT MODE</div>`;
+      let html = `<div class="menu-item active" onclick="setRestaurant('GLOBAL', this)">🌎 GLOBAL EXPERT DATABASE</div>`;
       html += restaurants.map(r => `<div class="menu-item" onclick="setRestaurant('${r.replace(/'/g, "\\'")}', this)">${r}</div>`).join('');
       resContainer.innerHTML = html;
       setRestaurant('GLOBAL', resContainer.firstChild); 
@@ -124,14 +119,15 @@
       if(el) el.classList.add('active');
       rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = (res === 'GLOBAL') ? "Expert Global Database" : `${res} Menu Active`;
+      status.innerText = (res === 'GLOBAL') ? "Global Mode Active" : `${res} Menu Active`;
     }
 
     function handleAction() {
-      isScanning = !isScanning;
-      if (appMode === 'Scan Wine List') {
-          if (!isScanning) finalizeWineScan();
+      if (appMode === 'Scan Wine List' && isScanning) {
+          finalizeWineScan();
+          return;
       }
+      isScanning = !isScanning;
       updateActionButton();
       if (isScanning) runAutoScan();
       else persistentMatches = [];
@@ -149,16 +145,19 @@
 
     async function runAutoScan() {
       if (!isScanning || !worker) return;
-      // WATCHDOG: Ensure video hasn't paused itself
       if (video.paused) video.play().catch(()=>{});
 
-      const off = document.createElement('canvas'); off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
+      const off = document.createElement('canvas'); 
+      off.width = 640; 
+      off.height = video.videoHeight * (640 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
+      
       try { 
           const result = await worker.recognize(off); 
           if (appMode === 'Scan Wine List') processWineLines(result.data.lines, off.width, off.height);
           else updateFoodBuffer(result.data.lines, off.width, off.height); 
       } catch (e) {}
+      
       if (isScanning) setTimeout(runAutoScan, 400);
     }
 
@@ -166,7 +165,7 @@
       const now = Date.now(), scaleX = canvas.width / scanW, scaleY = canvas.height / scanH;
       lines.forEach(line => {
         const txt = clean(line.text);
-        if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot') || txt.includes('glass') || txt.includes('bottle'))) {
+        if (txt.length > 7) {
             wineListBuffer.add(line.text);
             const scaledBbox = { x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY, x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY };
             const idx = persistentMatches.findIndex(m => m.itemName === txt.substring(0,12));
@@ -174,25 +173,42 @@
             else { persistentMatches.push({ itemName: txt.substring(0,12), bbox: scaledBbox, isDrinkHighlight: true, lastSeen: now }); }
         }
       });
-      status.innerText = `Index: ${wineListBuffer.size} drinks cached`;
+      status.innerText = `Caching Drinks: ${wineListBuffer.size} items`;
     }
 
-    async function finalizeWineScan() {
-      status.innerHTML = '<div class="spinner"></div> Index Saved! Switching Mode...';
+    function finalizeWineScan() {
+      // 1. Immediately store list text for instant cross-referencing
       lastScannedWineText = clean(Array.from(wineListBuffer).join(' '));
       
-      const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
-      off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      const base64 = off.toDataURL('image/jpeg', 0.6);
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
-      
-      // SWITCH MODE IMMEDIATELY WITHOUT RELOAD
-      appMode = 'Scan Menu';
+      // 2. Instant mode switch
       isScanning = false;
+      appMode = 'Scan Menu';
       updateActionButton();
       persistentMatches = [];
+      status.innerText = "Wine List Stored. Scan Menu!";
+
+      // 3. BACKGROUND UPLOAD (Fire and Forget)
+      const off = document.createElement('canvas'); 
+      off.width = 1200; 
+      off.height = video.videoHeight * (1200 / video.videoWidth);
+      off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
+      const base64 = off.toDataURL('image/jpeg', 0.5);
+      
+      fetch(GAS_URL, { 
+          method: "POST", 
+          body: JSON.stringify({ 
+              base64: base64, 
+              ocr: Array.from(wineListBuffer).join('\n'), 
+              type: 'Scan Wine List', 
+              restaurant: currentRestaurant 
+          }) 
+      }).catch(e => console.log("Bg Upload Silent Error"));
+
+      // 4. Clean up buffer for the food mode
       wineListBuffer.clear();
-      status.innerText = "Step 2: Ready to scan food";
+      
+      // 5. Automatically trigger the food scan button logic
+      handleAction(); 
     }
 
     function updateFoodBuffer(lines, scanW, scanH) {
@@ -205,7 +221,10 @@
             const rows = activeMenu[foodKey];
             rows.forEach(row => {
               let wines = (currentMode === "somm") ? [row[3]] : (currentMode === "ai") ? [row[4], row[5]] : (currentMode === "expert") ? [row[7], row[8], row[9]] : [row[10], row[11], row[12]];
+              
+              // STRICT FILTER: Only use wines found in Step 1
               const valid = wines.filter(w => isWineMatch(w));
+              
               if (valid.length > 0) {
                 const scaledBbox = { x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY, x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY };
                 const idx = persistentMatches.findIndex(m => m.itemName === foodKey);
@@ -235,7 +254,7 @@
     }
 
     function drawWineHighlight(bbox, opacity) {
-        ctx.globalAlpha = Math.min(opacity, 0.5);
+        ctx.globalAlpha = Math.min(opacity, 0.4);
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 4;
         ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
         ctx.globalAlpha = 1.0;
@@ -259,7 +278,7 @@
     }
 
     function isWineMatch(wineName) {
-        if (!lastScannedWineText) return true;
+        if (!lastScannedWineText) return false; // Strict Mode: Must have a wine list scan
         const cleanRec = clean(wineName);
         const tokens = cleanRec.split(' ').filter(t => t.length > 4 && isNaN(t));
         if (tokens.length === 0) return lastScannedWineText.includes(cleanRec);
