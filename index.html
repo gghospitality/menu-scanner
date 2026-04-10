@@ -221,3 +221,33 @@
           const now = Date.now();
           persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
           persistentMatches.forEach(match => {
+            const age = now - match.lastSeen;
+            const opacity = age > (DECAY_TIME - 1000) ? (DECAY_TIME - age) / 1000 : 1;
+            drawOverlay(match.bbox, match.itemName, match.displayData, opacity);
+          });
+      }
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawOverlay(bbox, name, infoList, opacity) {
+        const fontSize = 14, lineHeight = 20, padding = 15;
+        ctx.font = `bold ${fontSize}px Arial`;
+        const title = name.toUpperCase();
+        let maxW = ctx.measureText(title).width;
+        ctx.font = `${fontSize - 2}px Arial`;
+        infoList.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
+        const boxWidth = maxW + (padding * 2), totalH = (infoList.length + 1) * lineHeight + (padding * 2);
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(title, bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
+        ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
+        [...new Set(infoList)].forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+        ctx.globalAlpha = 1.0;
+    }
+
+    function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
+    function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+  </script>
+</body>
+</html>
