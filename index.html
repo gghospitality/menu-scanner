@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v5.4</title>
+  <title>Sommurai AR Pro v5.2</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
-    
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
     .splash-btn { padding: 18px; border-radius: 15px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; color: white; background: #002d58; }
-    #splash-screen img { width: 220px; height: auto; margin-bottom: 20px; flex-shrink: 0; }
+    #splash-screen img { width: 220px; height: auto; margin-bottom: 20px; }
 
     #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; z-index: 1; }
@@ -31,12 +30,12 @@
 </head>
 <body>
 
-  <div id="version-tag">v5.4</div>
+  <div id="version-tag">v5.2</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
     <div id="splash-buttons">
-        <button class="splash-btn" onclick="startFlow('Scan Wine List')">STEP 1: SCAN WINE LIST</button>
+        <button class="splash-btn" onclick="startFlow('Scan Wine List')">STEP 1: LIVE WINE INDEX</button>
         <button class="splash-btn" style="background:#34C759" onclick="startFlow('Scan Menu')">STEP 2: SCAN FOOD MENU</button>
         <button class="splash-btn" style="background:#444" onclick="startFlow('Menu List')">DATABASE VIEW</button>
     </div>
@@ -61,11 +60,11 @@
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
     const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
-    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
-    let wineListText = "", isScanning = false, persistentMatches = [], wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
+    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
+    let isScanning = false, persistentMatches = [], wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
     const DECAY_TIME = 8000;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwjlC8w43vnjNTjKiTjsX1LL-5YLcMcOmW-Ls7290p5n0TqhpcKNR6JXFL-Ssi8ULVg/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwh5YftqGES6otjV-NUl5CCcDXHpywq7JZH8UParpFDZa31lPwsY7FxbqGFLstO6a5c/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -90,7 +89,7 @@
 
     async function initAI() {
       worker = await Tesseract.createWorker('eng', 1, {
-        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Analyzing: ${Math.round(m.progress * 100)}%`; }
+        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Thinking: ${Math.round(m.progress * 100)}%`; }
       });
       status.innerText = "Engine Ready";
     }
@@ -103,7 +102,7 @@
 
     function populateRestaurants() {
       const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
-      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
+      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Database</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
       setRes('GLOBAL');
     }
 
@@ -111,7 +110,7 @@
       activeMenu = {}; currentRestaurant = res;
       rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = res + " Active";
+      status.innerText = res + " Brain Active";
     }
 
     function handleAction() {
@@ -142,13 +141,13 @@
         if (appMode === 'Scan Wine List') {
             result.data.lines.forEach(l => {
                 const txt = clean(l.text);
-                if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot'))) {
+                if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot') || txt.includes('glass'))) {
                     wineListBuffer.add(l.text);
                     ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3;
                     ctx.strokeRect(l.bbox.x0*(canvas.width/640), l.bbox.y0*(canvas.height/off.height), (l.bbox.x1-l.bbox.x0)*(canvas.width/640), (l.bbox.y1-l.bbox.y0)*(canvas.height/off.height));
                 }
             });
-            status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
+            status.innerText = `Indexing: ${wineListBuffer.size} drinks cached`;
         } else {
             ctx.clearRect(0,0,canvas.width,canvas.height);
             processFoodMatches(result.data.lines, 640, off.height);
@@ -160,19 +159,25 @@
     function finalizeWine() {
       isScanning = false;
       wineListText = clean(Array.from(wineListBuffer).join(' '));
-      const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
+      const off = document.createElement('canvas'); off.width = 1000; off.height = video.videoHeight * (1000 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      
-      // SEND ONE FINAL UPLOAD
-      fetch(GAS_URL, { 
-          method: "POST", 
-          body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) 
-      });
-      
-      appMode = 'Scan Menu'; 
-      updateActionBtnUI();
-      status.innerText = "Index Stored. Scan Menu!";
-      handleAction();
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
+      appMode = 'Scan Menu'; updateActionBtnUI();
+      status.innerText = "Wine Index Saved. Scan Menu!";
+      handleAction(); 
+    }
+
+    function isWineMatch(wineRec) {
+        if(!wineRec || !wineListText) return false;
+        const tokens = clean(wineRec).split(' ').filter(t => t.length > 4 && isNaN(t));
+        // Two-Factor check: Producer AND a Style/Cuvée word must match
+        const producer = tokens[0];
+        const cuvee = tokens[1] || "";
+        
+        if (!producer) return false;
+        if (!cuvee) return wineListText.includes(producer);
+        
+        return wineListText.includes(producer) && (wineListText.includes(cuvee) || wineListText.includes(tokens[2] || ""));
     }
 
     function processFoodMatches(lines, sw, sh) {
@@ -180,21 +185,13 @@
       lines.forEach(line => {
         const scanText = clean(line.text);
         Object.keys(activeMenu).forEach(key => {
-          
-          // --- STRICT FOOD MATCHING ---
           const dbWords = key.split(' ').filter(w => w.length > 3 && w !== "with");
           const allWordsMatch = dbWords.every(word => scanText.includes(word));
           
           if (allWordsMatch && key.length > 4) {
             const rows = activeMenu[key];
             let options = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
-            
-            // --- STRICT WINE FILTERING ---
-            const valid = options.filter(wineRec => {
-                if(!wineRec || !wineListText) return false;
-                const producer = clean(wineRec).split(' ').find(word => word.length > 4 && isNaN(word));
-                return producer && wineListText.includes(producer);
-            });
+            const valid = options.filter(w => isWineMatch(w));
             
             if (valid.length > 0) {
                drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
