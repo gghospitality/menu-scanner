@@ -3,30 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v4.8</title>
+  <title>Sommurai AR Pro v4.9</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
+    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
+    
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
     .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; }
-    #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
+    
+    #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; display: flex; }
     video { width: 100%; height: 100%; object-fit: cover; z-index: 1; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 5; }
+    
     #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
     .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
     .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
-    .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 80%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
-    #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
-    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; transition: 0.2s; }
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 5px 15px; border-radius: 15px; font-size: 10px; z-index: 5000; display: none; font-weight: bold; }
-    #version-tag { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #444; }
+    
+    #status { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 13px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 8px 20px; border-radius: 20px; font-size: 11px; z-index: 5000; display: none; font-weight: bold; }
+
+    #controls { 
+        height: 180px; background: #1a1a1a; 
+        display: flex; flex-direction: column; justify-content: center; align-items: center; 
+        padding-bottom: 50px; border-top: 1px solid #333; z-index: 1000; 
+    }
+    .main-btn { padding: 22px 0; font-size: 20px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
   </style>
 </head>
 <body>
 
-  <div id="version-tag">v4.8</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
@@ -40,14 +46,14 @@
   <div id="menu-nav">
     <div class="menu-group"><div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div><div id="resMenu" class="menu-content"></div></div>
     <div class="menu-group" id="logic-trigger"><div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div><div id="modeMenu" class="menu-content">
-        <div class="menu-item" onclick="setMode('somm', this)" style="color:#34C759">Somm Pick (D)</div>
-        <div class="menu-item" onclick="setMode('ai', this)">AI Somm Pick (E,F)</div>
-        <div class="menu-item" onclick="setMode('expert', this)">Expert (H,I,J)</div>
-        <div class="menu-item" onclick="setMode('basic', this)">Basic (K,L,M)</div>
+        <div class="menu-item" onclick="setMode('somm', this)" style="color:#34C759; padding:15px; border-bottom:1px solid #333;">Somm Pick (D)</div>
+        <div class="menu-item" onclick="setMode('ai', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">AI Somm Pick (E,F)</div>
+        <div class="menu-item" onclick="setMode('expert', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">Expert (H,I,J)</div>
+        <div class="menu-item" onclick="setMode('basic', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">Basic (K,L,M)</div>
     </div></div>
   </div>
 
-  <div id="status">Syncing...</div>
+  <div id="status">Syncing Data...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -58,27 +64,31 @@
     let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
     let wineListText = "", isScanning = false, wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwW9eRW50mkxKo2YikVjJEQxlBbzphkECfi6b3iYbPUywnnn1IzWw-_zvgK3R8qU4yL/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyHzT__CNt0S3b08oKn0zcdEFajuyWLOLFL5yBJ9GC6DWbLexhjWzn4l7H6Y7Y-5rcm/exec";
 
     async function startFlow(mode) {
       appMode = mode;
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
-      video.srcObject = stream;
-      video.onloadedmetadata = () => {
-          video.play();
-          document.getElementById('splash-screen').style.display = 'none';
-          document.getElementById('menu-nav').style.display = 'flex';
-          startOverBtn.style.display = 'block';
-          updateActionBtnUI();
-          loadSheetData();
-          initAI();
-      };
+      const cam = await initCamera();
+      if (cam) {
+        document.getElementById('splash-screen').style.display = 'none';
+        document.getElementById('menu-nav').style.display = 'flex';
+        startOverBtn.style.display = 'block';
+        updateActionBtnUI();
+        loadSheetData();
+        initAI();
+      }
+    }
+
+    async function initCamera() {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+        video.srcObject = s;
+        return new Promise(r => video.onloadedmetadata = () => { video.play(); r(true); });
+      } catch (e) { alert("Camera Access Error"); return false; }
     }
 
     async function initAI() {
-      worker = await Tesseract.createWorker('eng', 1, {
-        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Analyzing: ${Math.round(m.progress * 100)}%`; }
-      });
+      worker = await Tesseract.createWorker('eng', 1);
       status.innerText = "Engine Ready";
     }
 
@@ -89,9 +99,8 @@
     }
 
     function populateRestaurants() {
-      const resContainer = document.getElementById('resMenu');
       const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
-      resContainer.innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')">🌎 Global Database</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')">${r}</div>`).join('');
+      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Database</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
       setRes('GLOBAL');
     }
 
@@ -123,11 +132,8 @@
     async function runScanLoop() {
       if (!isScanning || !worker) return;
       if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-
-      const off = document.createElement('canvas'); 
-      off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
+      const off = document.createElement('canvas'); off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      
       try {
         const result = await worker.recognize(off);
         if (appMode === 'Scan Wine List') {
@@ -135,7 +141,6 @@
                 const txt = clean(l.text);
                 if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot'))) {
                     wineListBuffer.add(l.text);
-                    // Live highlight (v4.3 style)
                     ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3;
                     ctx.strokeRect(l.bbox.x0*(canvas.width/640), l.bbox.y0*(canvas.height/off.height), (l.bbox.x1-l.bbox.x0)*(canvas.width/640), (l.bbox.y1-l.bbox.y0)*(canvas.height/off.height));
                 }
@@ -152,58 +157,49 @@
     function finalizeWine() {
       isScanning = false;
       wineListText = clean(Array.from(wineListBuffer).join(' '));
-      const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
+      const off = document.createElement('canvas'); off.width = 1000; off.height = video.videoHeight * (1000 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
-      appMode = 'Scan Menu'; persistentMatches = []; updateActionBtnUI();
-      status.innerText = "Step 1 Complete. Ready for Menu.";
+      appMode = 'Scan Menu'; updateActionBtnUI();
+      status.innerText = "Step 1 Saved. Ready for Menu.";
     }
 
     function processFoodMatches(lines, sw, sh) {
       const sx = canvas.width / sw, sy = canvas.height / sh;
       lines.forEach(line => {
-        const txt = clean(line.text);
+        const scanText = clean(line.text);
         Object.keys(activeMenu).forEach(key => {
-          
-          // --- STRICT FOOD MATCHING ---
+          // HYPER-STRICT MATCH: Every word in the DB name must appear in the scanned line
           const dbWords = key.split(' ').filter(w => w.length > 3);
-          const matchCount = dbWords.filter(w => txt.includes(w)).length;
+          const allWordsPresent = dbWords.every(word => scanText.includes(word));
           
-          if (matchCount >= dbWords.length && key.length > 4) {
+          if (allWordsPresent && key.length > 4) {
             const rows = activeMenu[key];
-            let options = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
+            let opts = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
             
-            // --- STRICT WINE FILTER ---
-            const valid = options.filter(w => {
+            const valid = opts.filter(w => {
                 if(!w || !wineListText) return false;
                 const producer = clean(w).split(' ').find(word => word.length > 4);
                 return producer && wineListText.includes(producer);
             });
             
-            if (valid.length > 0) {
-               drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
-            }
+            if (valid.length > 0) drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
           }
         });
       });
     }
 
     function drawInfoBox(bbox, name, infoList, sx, sy) {
-        const fontSize = 14, lineHeight = 20, padding = 15;
         const x = bbox.x0 * sx, y = bbox.y0 * sy;
-        
-        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.font = "bold 14px Arial";
         let maxW = ctx.measureText(name.toUpperCase()).width;
-        ctx.font = `${fontSize - 2}px Arial`;
+        ctx.font = "12px Arial";
         infoList.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
-        
-        const boxWidth = maxW + (padding * 2), totalH = (infoList.length + 1) * lineHeight + (padding * 2);
-        
-        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(x, y - totalH - 5, boxWidth, totalH, 10); ctx.fill();
-        ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(name.toUpperCase(), x + padding, y - totalH + padding + 14);
-        ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
-        [...new Set(infoList)].forEach((t, i) => { ctx.fillText("• " + t, x + padding, y - totalH + padding + 14 + (lineHeight * (i+1))); });
-        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(x, y, (bbox.x1-bbox.x0)*sx, (bbox.y1-bbox.y0)*sy);
+        const boxW = maxW + 30, totalH = (infoList.length + 1) * 22 + 20;
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(x, y - totalH - 5, boxW, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), x + 15, y - totalH + 28);
+        ctx.fillStyle = "white"; ctx.font = "12px Arial";
+        [...new Set(infoList)].forEach((t, i) => ctx.fillText("• " + t, x + 15, y - totalH + 28 + (22 * (i+1))));
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
