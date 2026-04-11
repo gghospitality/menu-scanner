@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v7.0</title>
+  <title>Sommurai AR Pro v7.1</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
+    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
     .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; }
@@ -48,7 +48,7 @@
     </div></div>
   </div>
 
-  <div id="status">Syncing Data...</div>
+  <div id="status">Syncing...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -60,7 +60,7 @@
     let worker = null, wineListRaw = "", wineListTextClean = "", isScanning = false, currentRestaurant = "GLOBAL";
     let wineListBuffer = new Set();
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzZJQ5xMfMvSuXSbt933G3pYTKb2EFiIS6qlWyknOl7fPJl_y8NUUCTuPQgt_EmG2KL/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbz4vSWNVQ8Fnlhu73RZgNq4wszFd4WWStwSxlohcoDrAas6mrxvcEgzHJfGvDSGIIix/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -69,12 +69,10 @@
       startOverBtn.style.display = 'block';
       updateActionBtnUI();
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
-        video.srcObject = stream;
-        video.onloadedmetadata = () => video.play();
-        loadSheetData();
-        initAI();
-      } catch (e) { alert("Camera Access Error"); }
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+        video.srcObject = s; video.onloadedmetadata = () => video.play();
+        loadSheetData(); initAI();
+      } catch (e) { alert("Camera Error"); }
     }
 
     async function initAI() { worker = await Tesseract.createWorker('eng', 1); status.innerText = "Engine Ready"; }
@@ -126,7 +124,7 @@
         const result = await worker.recognize(off);
         if (appMode === 'Scan Wine List') {
             result.data.lines.forEach(l => { if (clean(l.text).length > 7) wineListBuffer.add(l.text); });
-            status.innerText = `Indexing: ${wineListBuffer.size} items found`;
+            status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
         } else {
             ctx.clearRect(0,0,canvas.width,canvas.height);
             processMatches(result.data.lines, 800, off.height);
@@ -143,85 +141,41 @@
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: wineListRaw, type: 'Scan Wine List', restaurant: currentRestaurant }) });
       appMode = 'Scan Menu'; updateActionBtnUI();
-      status.innerText = "Step 1 Stored. Scan Menu!";
+      status.innerText = "Wine List Indexed. Scan Menu!";
       handleAction();
     }
 
-    // --- ENHANCED ANCHOR MATCHING ENGINE ---
+    // --- REVERTED STABLE MATCHING ENGINE (v4.9 Logic) ---
     function processMatches(lines, sw, sh) {
       const sx = canvas.width / sw, sy = canvas.height / sh;
       lines.forEach(line => {
         const scanLineClean = clean(line.text);
         
-        // 1. Specific Database Match (Bistro Jeanty, etc.)
+        // 1. PRIORITY: Database Match (Bistro Jeanty, etc.)
         if (currentRestaurant !== "GLOBAL") {
             Object.keys(activeMenu).forEach(dishKey => {
-                // ANCHOR LOGIC: Find the most unique word in the dish name
-                const anchor = dishKey.split(' ').sort((a,b) => b.length - a.length)[0];
-                if (scanLineClean.includes(anchor) && anchor.length > 4) {
+                // ANCHOR: Check if the menu line includes the primary words of the dish
+                const dishWords = dishKey.split(' ').filter(w => w.length > 4);
+                if (dishWords.every(w => scanLineClean.includes(w)) && dishKey.length > 4) {
                     const row = activeMenu[dishKey][0];
                     let opts = (currentMode === 'somm' ? [row[3]] : currentMode === 'ai' ? [row[4], row[5]] : [row[7], row[8]]);
-                    const valid = opts.filter(w => isWineOnList(w));
-                    if (valid.length > 0) drawInfoBox(line.bbox, row[1], valid, sx, sy);
+                    // Skip wine list filter if at a known restaurant (Direct database pairing)
+                    drawInfoBox(line.bbox, row[1], opts, sx, sy);
+                }
+            });
+        } else {
+            // 2. FALLBACK: Global Logic Rules Match (Sailor / New Menus)
+            logicRules.slice(1).forEach(rule => {
+                const foodName = clean(rule[1]);
+                if (scanLineClean.includes(foodName) && foodName.length > 4) {
+                    let targetVar = (currentMode === 'somm' ? rule[3] : currentMode === 'ai' ? rule[4] + "," + rule[5] : rule[7] + "," + rule[8]);
+                    const foundWines = findWineMatches(targetVar);
+                    if (foundWines.length > 0) drawInfoBox(line.bbox, rule[1], foundWines, sx, sy);
                 }
             });
         }
-
-        // 2. Logic Rules Match (Sailor / New Menus)
-        logicRules.slice(1).forEach(rule => {
-            const foodName = clean(rule[1]);
-            const anchor = foodName.split(' ').sort((a,b) => b.length - a.length)[0];
-            if (scanLineClean.includes(anchor) && anchor.length > 4) {
-                let targetVar = (currentMode === 'somm' ? rule[3] : currentMode === 'ai' ? rule[4] + "," + rule[5] : rule[7] + "," + rule[8]);
-                const foundWines = findWineOnList(targetVar);
-                if (foundWines.length > 0) drawInfoBox(line.bbox, rule[1], foundWines, sx, sy);
-            }
-        });
       });
     }
 
-    function isWineOnList(wineRec) {
-        if(!wineRec || !wineListTextClean) return false;
-        // Search for the primary keyword of the wine producer
-        const producer = clean(wineRec).split(' ').find(w => w.length > 4 && isNaN(w));
-        return producer && wineListTextClean.includes(producer);
-    }
-
-    function findWineOnList(vStr) {
+    function findWineMatches(vStr) {
         if (!vStr || !wineListRaw) return [];
-        const targets = vStr.split(',').map(v => clean(v.trim())).filter(v => v.length > 3);
-        const listLines = wineListRaw.split('\n');
-        let res = [];
-        for (let line of listLines) {
-            const cL = clean(line);
-            for (let t of targets) { if (cL.includes(t)) { res.push(line.trim()); break; } }
-            if (res.length >= 2) break;
-        }
-        return res;
-    }
-
-    function drawInfoBox(bbox, name, infoList, sx, sy) {
-        const x = bbox.x0 * sx, y = bbox.y0 * sy;
-        ctx.font = "bold 14px Arial";
-        let maxW = ctx.measureText(name.toUpperCase()).width;
-        ctx.font = "12px Arial";
-        infoList.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
-        const boxW = maxW + 30, totalH = (infoList.length + 1) * 22 + 20;
-        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(x, y - totalH - 5, boxW, totalH, 10); ctx.fill();
-        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), x + 15, y - totalH + 28);
-        ctx.fillStyle = "white"; ctx.font = "12px Arial";
-        [...new Set(infoList)].forEach((t, i) => ctx.fillText("• " + t, x + 15, y - totalH + 28 + (22 * (i+1))));
-        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(x, y, (bbox.x1-bbox.x0)*sx, (bbox.y1-bbox.y0)*sy);
-    }
-
-    function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
-    function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
-    function setMode(m, el) { 
-        currentMode = m; 
-        document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); 
-        el.style.color = '#34C759'; 
-        toggleMenu('modeMenu'); 
-    }
-  </script>
-</body>
-</html>
