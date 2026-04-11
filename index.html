@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v4.7</title>
+  <title>Sommurai AR Pro v4.8</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
@@ -17,37 +17,37 @@
     .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
     .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
     .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 80%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
     #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
-    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; transition: 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 8px 20px; border-radius: 15px; font-size: 10px; z-index: 5000; display: none; font-weight: bold; }
+    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; transition: 0.2s; }
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 5px 15px; border-radius: 15px; font-size: 10px; z-index: 5000; display: none; font-weight: bold; }
     #version-tag { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #444; }
   </style>
 </head>
 <body>
 
-  <div id="version-tag">v4.7</div>
+  <div id="version-tag">v4.8</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
     <div id="splash-buttons">
-        <button class="splash-btn btn-blue" onclick="startFlow('Scan Wine List')">STEP 1: SCAN WINE LIST</button>
-        <button class="splash-btn btn-blue" style="background:#34C759" onclick="startFlow('Scan Menu')">SKIP TO FOOD SCAN</button>
+        <button class="splash-btn" onclick="startFlow('Scan Wine List')">STEP 1: SCAN WINE LIST</button>
+        <button class="splash-btn" style="background:#34C759" onclick="startFlow('Scan Menu')">STEP 2: SCAN FOOD MENU</button>
     </div>
-    <img src="logo.png" alt="Sommurai Logo">
+    <img src="logo.png" style="width:250px">
   </div>
 
   <div id="menu-nav">
     <div class="menu-group"><div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div><div id="resMenu" class="menu-content"></div></div>
     <div class="menu-group" id="logic-trigger"><div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div><div id="modeMenu" class="menu-content">
-        <div class="menu-item active" onclick="setMode('somm', this)">Somm Pick (D)</div>
+        <div class="menu-item" onclick="setMode('somm', this)" style="color:#34C759">Somm Pick (D)</div>
         <div class="menu-item" onclick="setMode('ai', this)">AI Somm Pick (E,F)</div>
         <div class="menu-item" onclick="setMode('expert', this)">Expert (H,I,J)</div>
         <div class="menu-item" onclick="setMode('basic', this)">Basic (K,L,M)</div>
     </div></div>
   </div>
 
-  <div id="status">Syncing Data...</div>
+  <div id="status">Syncing...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -55,211 +55,160 @@
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
     const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
-    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
-    let isScanning = false, persistentMatches = [], wineListBuffer = new Set();
-    const DECAY_TIME = 5000;
+    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
+    let wineListText = "", isScanning = false, wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzr0vNCrPpC6ZuT9a5oX3HCG5OABKqNonHeOiCP1JMExxGgcD2QnKq8BS9JB-MeYhtw/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwW9eRW50mkxKo2YikVjJEQxlBbzphkECfi6b3iYbPUywnnn1IzWw-_zvgK3R8qU4yL/exec";
 
     async function startFlow(mode) {
       appMode = mode;
-      const cameraStarted = await initCamera();
-      if (cameraStarted) {
-        document.getElementById('splash-screen').style.display = 'none';
-        document.getElementById('menu-nav').style.display = 'flex';
-        startOverBtn.style.display = 'block';
-        updateActionButton();
-        loadSheetData();
-        initAI();
-        requestAnimationFrame(renderLoop);
-      }
-    }
-
-    async function initCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } }, audio: false });
-        video.srcObject = stream;
-        return new Promise((resolve) => {
-          video.onloadedmetadata = () => { video.play().then(() => resolve(true)).catch(() => resolve(true)); };
-        });
-      } catch (e) { alert("Camera Access Error"); return false; }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+          video.play();
+          document.getElementById('splash-screen').style.display = 'none';
+          document.getElementById('menu-nav').style.display = 'flex';
+          startOverBtn.style.display = 'block';
+          updateActionBtnUI();
+          loadSheetData();
+          initAI();
+      };
     }
 
     async function initAI() {
-      if (worker) return;
       worker = await Tesseract.createWorker('eng', 1, {
         logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Analyzing: ${Math.round(m.progress * 100)}%`; }
       });
-      status.innerText = "Sommurai Ready";
+      status.innerText = "Engine Ready";
     }
 
     async function loadSheetData() {
-      const resp = await fetch(GAS_URL, { redirect: 'follow' });
-      rawSheetData = await resp.json();
+      const r = await fetch(GAS_URL, { redirect: 'follow' });
+      rawSheetData = await r.json();
       populateRestaurants();
     }
 
     function populateRestaurants() {
       const resContainer = document.getElementById('resMenu');
-      const restaurants = [...new Set(rawSheetData.slice(1).map(row => row[0]))].filter(r => r).sort();
-      let html = `<div class="menu-item active" onclick="setRestaurant('GLOBAL', this)">🌎 GLOBAL EXPERT DATABASE</div>`;
-      html += restaurants.map(r => `<div class="menu-item" onclick="setRestaurant('${r.replace(/'/g, "\\'")}', this)">${r}</div>`).join('');
-      resContainer.innerHTML = html;
-      setRestaurant('GLOBAL', resContainer.firstChild); 
+      const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
+      resContainer.innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')">🌎 Global Database</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')">${r}</div>`).join('');
+      setRes('GLOBAL');
     }
 
-    function setRestaurant(res, el) {
-      activeMenu = {};
-      document.querySelectorAll('#resMenu .menu-item').forEach(i => i.classList.remove('active'));
-      if(el) el.classList.add('active');
-      rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
+    function setRes(res) {
+      activeMenu = {}; currentRestaurant = res;
+      rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = (res === 'GLOBAL') ? "Expert Knowledge Active" : `${res} Menu Active`;
+      status.innerText = res + " Brain Active";
     }
 
     function handleAction() {
-      if (appMode === 'Scan Wine List' && isScanning) {
-          finalizeWineScan();
-          return;
-      }
+      if (appMode === 'Scan Wine List' && isScanning) { finalizeWine(); return; }
       isScanning = !isScanning;
-      updateActionButton();
+      updateActionBtnUI();
       if (isScanning) runScanLoop();
-      else persistentMatches = [];
+      else ctx.clearRect(0,0,canvas.width,canvas.height);
     }
 
-    function updateActionButton() {
-        if (appMode === 'Scan Wine List') {
-            actionBtn.innerText = isScanning ? "FINISH WINE SCAN" : "START WINE INDEXING";
-            actionBtn.style.background = isScanning ? "#2196F3" : "#002d58";
-        } else {
-            actionBtn.innerText = isScanning ? "STOP LIVE SCAN" : "START LIVE MENU SCAN";
-            actionBtn.style.background = isScanning ? "#f44336" : "#34C759";
-        }
+    function updateActionBtnUI() {
+      if (appMode === 'Scan Wine List') {
+        actionBtn.innerText = isScanning ? "FINISH WINE SCAN" : "START WINE INDEXING";
+        actionBtn.style.background = isScanning ? "#2196F3" : "#002d58";
+      } else {
+        actionBtn.innerText = isScanning ? "STOP LIVE SCAN" : "START LIVE MENU SCAN";
+        actionBtn.style.background = isScanning ? "#f44336" : "#34C759";
+      }
     }
 
     async function runScanLoop() {
       if (!isScanning || !worker) return;
-      if (video.paused) video.play().catch(()=>{});
+      if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
 
       const off = document.createElement('canvas'); 
       off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       
-      try { 
-          const result = await worker.recognize(off); 
-          if (appMode === 'Scan Wine List') processWineLines(result.data.lines, off.width, off.height);
-          else updateFoodBuffer(result.data.lines, off.width, off.height); 
-      } catch (e) {}
-      
-      if (isScanning) setTimeout(runScanLoop, 400);
-    }
-
-    function processWineLines(lines, sw, sh) {
-      const now = Date.now(), sx = canvas.width / sw, sy = canvas.height / sh;
-      lines.forEach(line => {
-        const txt = clean(line.text);
-        if (txt.length > 7) {
-            wineListBuffer.add(line.text);
-            const scaledBbox = { x0: line.bbox.x0 * sx, y0: line.bbox.y0 * sy, x1: line.bbox.x1 * sx, y1: line.bbox.y1 * sy };
-            const idx = persistentMatches.findIndex(m => m.itemName === txt.substring(0,10));
-            if (idx > -1) { persistentMatches[idx].lastSeen = now; }
-            else { persistentMatches.push({ itemName: txt.substring(0,10), bbox: scaledBbox, isDrinkHighlight: true, lastSeen: now }); }
+      try {
+        const result = await worker.recognize(off);
+        if (appMode === 'Scan Wine List') {
+            result.data.lines.forEach(l => {
+                const txt = clean(l.text);
+                if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot'))) {
+                    wineListBuffer.add(l.text);
+                    // Live highlight (v4.3 style)
+                    ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3;
+                    ctx.strokeRect(l.bbox.x0*(canvas.width/640), l.bbox.y0*(canvas.height/off.height), (l.bbox.x1-l.bbox.x0)*(canvas.width/640), (l.bbox.y1-l.bbox.y0)*(canvas.height/off.height));
+                }
+            });
+            status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
+        } else {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            processFoodMatches(result.data.lines, 640, off.height);
         }
-      });
-      status.innerText = `Indexing: ${wineListBuffer.size} items found`;
+      } catch (e) {}
+      if (isScanning) setTimeout(runScanLoop, 500);
     }
 
-    function finalizeWineScan() {
-      lastScannedWineText = clean(Array.from(wineListBuffer).join(' '));
+    function finalizeWine() {
+      isScanning = false;
+      wineListText = clean(Array.from(wineListBuffer).join(' '));
       const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      const base64 = off.toDataURL('image/jpeg', 0.5);
-      
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) }).catch(e => {});
-
-      isScanning = false;
-      appMode = 'Scan Menu';
-      updateActionButton();
-      persistentMatches = [];
-      wineListBuffer.clear();
-      status.innerText = "Step 1 Complete. Scan Menu!";
-      handleAction(); 
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
+      appMode = 'Scan Menu'; persistentMatches = []; updateActionBtnUI();
+      status.innerText = "Step 1 Complete. Ready for Menu.";
     }
 
-    function updateFoodBuffer(lines, sw, sh) {
-      const now = Date.now(), sx = canvas.width / sw, sy = canvas.height / sh;
+    function processFoodMatches(lines, sw, sh) {
+      const sx = canvas.width / sw, sy = canvas.height / sh;
       lines.forEach(line => {
-        const scanText = clean(line.text);
+        const txt = clean(line.text);
         Object.keys(activeMenu).forEach(key => {
           
-          // --- STRICT FOOD MATCHING: At least 90% of words in DB item must appear in scanned line ---
+          // --- STRICT FOOD MATCHING ---
           const dbWords = key.split(' ').filter(w => w.length > 3);
-          const matchCount = dbWords.filter(w => scanText.includes(w)).length;
+          const matchCount = dbWords.filter(w => txt.includes(w)).length;
           
           if (matchCount >= dbWords.length && key.length > 4) {
             const rows = activeMenu[key];
-            rows.forEach(row => {
-              let wines = (currentMode === "somm") ? [row[3]] : (currentMode === "ai") ? [row[4], row[5]] : (currentMode === "expert") ? [row[7], row[8], row[9]] : [row[10], row[11], row[12]];
-              
-              // --- STRICT WINE FILTERING: Recommended wine MUST be in the wine list memory ---
-              const valid = wines.filter(w => {
-                  if(!w || !lastScannedWineText) return false;
-                  const producer = clean(w).split(' ').find(word => word.length > 4);
-                  return producer && lastScannedWineText.includes(producer);
-              });
-              
-              if (valid.length > 0) {
-                const scaledBbox = { x0: line.bbox.x0 * sx, y0: line.bbox.y0 * sy, x1: line.bbox.x1 * sx, y1: line.bbox.y1 * sy };
-                const idx = persistentMatches.findIndex(m => m.itemName === key);
-                if (idx > -1) { persistentMatches[idx].bbox = scaledBbox; persistentMatches[idx].lastSeen = now; persistentMatches[idx].displayData = valid; }
-                else { persistentMatches.push({ itemName: row[1], bbox: scaledBbox, displayData: valid, lastSeen: now }); }
-              }
+            let options = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
+            
+            // --- STRICT WINE FILTER ---
+            const valid = options.filter(w => {
+                if(!w || !wineListText) return false;
+                const producer = clean(w).split(' ').find(word => word.length > 4);
+                return producer && wineListText.includes(producer);
             });
+            
+            if (valid.length > 0) {
+               drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
+            }
           }
         });
       });
     }
 
-    function renderLoop() {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          const now = Date.now();
-          persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
-          persistentMatches.forEach(m => {
-            const opacity = (DECAY_TIME - (now - m.lastSeen)) / 1000;
-            if (m.isDrinkHighlight) {
-                ctx.globalAlpha = Math.min(opacity, 0.4);
-                ctx.strokeStyle = "#34C759"; ctx.lineWidth = 4;
-                ctx.strokeRect(m.bbox.x0, m.bbox.y0, m.bbox.x1 - m.bbox.x0, m.bbox.y1 - m.bbox.y0);
-            } else {
-                drawFoodOverlay(m.bbox, m.itemName, m.displayData, opacity);
-            }
-          });
-          ctx.globalAlpha = 1.0;
-      }
-      requestAnimationFrame(renderLoop);
-    }
-
-    function drawFoodOverlay(bbox, name, infoList, opacity) {
+    function drawInfoBox(bbox, name, infoList, sx, sy) {
         const fontSize = 14, lineHeight = 20, padding = 15;
+        const x = bbox.x0 * sx, y = bbox.y0 * sy;
+        
         ctx.font = `bold ${fontSize}px Arial`;
         let maxW = ctx.measureText(name.toUpperCase()).width;
         ctx.font = `${fontSize - 2}px Arial`;
         infoList.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
+        
         const boxWidth = maxW + (padding * 2), totalH = (infoList.length + 1) * lineHeight + (padding * 2);
-        ctx.globalAlpha = Math.min(opacity, 1.0);
-        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
-        ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
+        
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(x, y - totalH - 5, boxWidth, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(name.toUpperCase(), x + padding, y - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
-        [...new Set(infoList)].forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
-        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+        [...new Set(infoList)].forEach((t, i) => { ctx.fillText("• " + t, x + padding, y - totalH + padding + 14 + (lineHeight * (i+1))); });
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(x, y, (bbox.x1-bbox.x0)*sx, (bbox.y1-bbox.y0)*sy);
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
     function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
-    function setMode(mode, el) { currentMode = mode; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.classList.remove('active')); el.classList.add('active'); toggleMenu('modeMenu'); persistentMatches = []; }
+    function setMode(m, el) { currentMode = m; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); el.style.color = '#34C759'; toggleMenu('modeMenu'); }
   </script>
 </body>
 </html>
