@@ -3,37 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sommurai AR Pro v8.7</title>
+  <title>Sommurai AR Pro v8.8</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root { --ios-safe: env(safe-area-inset-bottom); }
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
     
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; z-index: 9999; padding-top: 80px; box-sizing: border-box; }
-    #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
+    #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
     .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; }
     #splash-screen img { width: 220px; height: auto; margin-top: 20px; }
 
-    #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; display: flex; }
-    video { width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 5; }
+    #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
     
-    #menu-nav { position: fixed; top: 50px; left: 15px; display: none; flex-direction: column; gap: 15px; z-index: 3000; }
-    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; cursor: pointer; }
+    /* SYNCED VISION: Using 'contain' ensures coordinates match 1:1 */
+    video, canvas { position: absolute; width: 100%; height: 100%; object-fit: contain; }
+    video { z-index: 1; }
+    canvas { z-index: 5; pointer-events: none; }
+    
+    #menu-nav { position: fixed; top: 50px; left: 15px; display: none; flex-direction: column; gap: 15px; z-index: 6000; }
+    .menu-trigger { background: rgba(0,0,0,0.8); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
     .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
+    .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
 
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 11px; z-index: 4000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 11px; z-index: 7000; border: 1px solid #34C759; font-weight: bold; }
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 8000; display: none; font-weight: bold; }
 
-    #controls { min-height: 180px; background: #1a1a1a; display: none; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 120px; border-top: 1px solid #333; z-index: 1000; }
+    #controls { min-height: 180px; background: #1a1a1a; display: none; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 110px; border-top: 1px solid #333; z-index: 3000; }
     .app-active #controls { display: flex !important; }
     .app-active #menu-nav { display: flex !important; }
+
     .main-btn { padding: 22px 0; font-size: 20px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+    #version-tag { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #444; z-index: 50; }
   </style>
 </head>
 <body id="body-tag">
 
-  <div id="version-tag" style="position:fixed; bottom:10px; right:10px; font-size:10px; color:#444; z-index:50;">v8.7</div>
+  <div id="version-tag">v8.8</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
@@ -55,7 +61,7 @@
     </div></div>
   </div>
 
-  <div id="status">Syncing Data...</div>
+  <div id="status">Syncing...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -67,11 +73,9 @@
     let worker = null, wineListTextClean = "", isScanning = false, currentRestaurant = "GLOBAL";
     let wineListBuffer = new Set(), persistentMatches = [];
     
-    // AR SETTINGS
-    const DECAY_TIME = 3500; // Stay for 3.5s
-    const SMOOTHING = 0.4; // Low = slow/stable, High = fast/jittery
+    const DECAY_TIME = 1500; // Fast decay for moving camera
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzTsWzaMYvNYyIYrOBv0JIYaYFwKTlIKq811V1Gen1muFMzl0nRxippNduSNpMjPRsE/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbztRtxZeonrKDxwLRlztQcOdmA7mTHqVPqVYdTA2v4NhUs7_eCB9QY47BSk7SGSGbY5/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -80,8 +84,13 @@
       startOverBtn.style.display = 'block';
       updateActionBtnUI();
       try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
-        video.srcObject = s; video.onloadedmetadata = () => video.play();
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            video.play();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        };
         loadSheetData(); initAI();
         requestAnimationFrame(renderLoop);
       } catch (e) { alert("Camera Error"); }
@@ -98,7 +107,7 @@
 
     function populateRestaurants() {
       const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
-      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
+      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')">🌎 Global Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')">${r}</div>`).join('');
       setRes('GLOBAL');
     }
 
@@ -106,8 +115,7 @@
       activeMenu = {}; currentRestaurant = res;
       rawSheetData.slice(1).forEach(row => { if (row[0] === res) { const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = res + " Brain Active";
-      persistentMatches = [];
+      status.innerText = res + " Active";
     }
 
     function handleAction() {
@@ -130,24 +138,18 @@
 
     async function runScanLoop() {
       if (!isScanning || !worker) return;
-      if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
       const off = document.createElement('canvas'); off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       try {
         const result = await worker.recognize(off);
         if (appMode === 'Scan Wine List') {
-            const now = Date.now();
-            result.data.lines.forEach(l => { if (clean(l.text).length > 7) {
-                wineListBuffer.add(l.text);
-                const sx = canvas.width / 640, sy = canvas.height / off.height;
-                updatePersistence("wine", l.text, null, { x0: l.bbox.x0*sx, y0: l.bbox.y0*sy, x1: l.bbox.x1*sx, y1: l.bbox.y1*sy }, now);
-            }});
+            result.data.lines.forEach(l => { if (clean(l.text).length > 7) wineListBuffer.add(l.text); });
             status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
         } else {
             updateBuffer(result.data.lines, 640, off.height);
         }
       } catch (e) {}
-      if (isScanning) setTimeout(runScanLoop, 400);
+      if (isScanning) setTimeout(runScanLoop, 500);
     }
 
     function finalizeWine() {
@@ -157,7 +159,7 @@
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
       appMode = 'Scan Menu'; persistentMatches = []; updateActionBtnUI();
-      status.innerText = "Memory Stored. Scan Menu!";
+      status.innerText = "Stored. Scan Food!";
       handleAction();
     }
 
@@ -170,11 +172,9 @@
         if (currentRestaurant !== "GLOBAL") {
             Object.keys(activeMenu).forEach(dishKey => {
                 const dishTokens = dishKey.split(' ').filter(w => w.length > 3);
-                const matchScore = dishTokens.filter(w => scanLineClean.includes(w)).length;
-                if (matchScore >= Math.ceil(dishTokens.length * 0.7)) {
-                    const row = activeMenu[dishKey][0];
-                    let opts = (currentMode === 'somm' ? [row[3]] : currentMode === 'ai' ? [row[4], row[5]] : [row[7], row[8], row[9]]);
-                    updatePersistence(dishKey, row[1], opts, { x0: line.bbox.x0*sx, y0: line.bbox.y0*sy, x1: line.bbox.x1*sx, y1: line.bbox.y1*sy }, now);
+                const hits = dishTokens.filter(w => scanLineClean.includes(w)).length;
+                if (hits >= Math.ceil(dishTokens.length * 0.7) && dishKey.length > 4) {
+                    addMatch(dishKey, activeMenu[dishKey][0][1], activeMenu[dishKey][0], line.bbox, sx, sy, now);
                 }
             });
         } else {
@@ -183,29 +183,23 @@
                 const anchor = foodName.split(' ').sort((a,b) => b.length - a.length)[0]; 
                 if (scanLineClean.includes(anchor) && anchor.length > 4) {
                     let targetVar = (currentMode === 'somm' ? rule[3] : currentMode === 'ai' ? rule[4] + "," + rule[5] : rule[7] + "," + rule[8]);
-                    const wines = findWineMatches(targetVar);
-                    if (wines.length > 0) updatePersistence(foodName, rule[1], wines, { x0: line.bbox.x0*sx, y0: line.bbox.y0*sy, x1: line.bbox.x1*sx, y1: line.bbox.y1*sy }, now);
+                    const foundWines = findWineMatches(targetVar);
+                    if (foundWines.length > 0) addMatch(foodName, rule[1], foundWines, line.bbox, sx, sy, now);
                 }
             });
         }
       });
     }
 
-    // --- AR LOGIC: Smoothing and Locking ---
-    function updatePersistence(id, name, data, bbox, now) {
+    function addMatch(id, name, data, bbox, sx, sy, now) {
+        const x = bbox.x0 * sx, y = bbox.y0 * sy;
         const existingIdx = persistentMatches.findIndex(m => m.id === id);
         if (existingIdx > -1) {
-            const m = persistentMatches[existingIdx];
-            // Linear Interpolation (LERP) for smooth tracking
-            m.bbox.x0 = (m.bbox.x0 * (1 - SMOOTHING)) + (bbox.x0 * SMOOTHING);
-            m.bbox.y0 = (m.bbox.y0 * (1 - SMOOTHING)) + (bbox.y0 * SMOOTHING);
-            m.bbox.x1 = (m.bbox.x1 * (1 - SMOOTHING)) + (bbox.x1 * SMOOTHING);
-            m.bbox.y1 = (m.bbox.y1 * (1 - SMOOTHING)) + (bbox.y1 * SMOOTHING);
-            m.lastSeen = now;
+            persistentMatches[existingIdx].bbox = { x0: x, y0: y, x1: bbox.x1 * sx, y1: bbox.y1 * sy };
+            persistentMatches[existingIdx].lastSeen = now;
         } else {
-            // Check vertical collision to prevent stacking
-            if (!persistentMatches.some(m => Math.abs(m.bbox.y0 - bbox.y0) < 40)) {
-                persistentMatches.push({ id, name, data, bbox, lastSeen: now });
+            if (!persistentMatches.some(m => Math.abs(m.bbox.y0 - y) < 45)) {
+                persistentMatches.push({ id, name, data, bbox: { x0: x, y0: y, x1: bbox.x1 * sx, y1: bbox.y1 * sy }, lastSeen: now });
             }
         }
     }
@@ -225,26 +219,14 @@
 
     function renderLoop() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-      
       const now = Date.now();
-      persistentMatches = persistentMatches.filter(m => {
-          const isRecent = (now - m.lastSeen) < DECAY_TIME;
-          const isVisible = m.bbox.y0 > 20 && m.bbox.y1 < (canvas.height - 20); // OFF-SCREEN AUTO HIDE
-          return isRecent && isVisible;
-      });
+      persistentMatches = persistentMatches.filter(m => (now - m.lastSeen) < DECAY_TIME);
 
       persistentMatches.forEach(m => {
         const opacity = Math.min(1, (DECAY_TIME - (now - m.lastSeen)) / 1000);
-        if (m.id === "wine") {
-            ctx.globalAlpha = 0.4 * opacity;
-            ctx.strokeStyle = "#34C759"; ctx.lineWidth = 4;
-            ctx.strokeRect(m.bbox.x0, m.bbox.y0, m.bbox.x1 - m.bbox.x0, m.bbox.y1 - m.bbox.y0);
-        } else {
-            drawInfoBox(m.bbox, m.name, m.data, opacity);
-        }
+        const info = Array.isArray(m.data) ? m.data : [m.data[3], m.data[4]];
+        drawInfoBox(m.bbox, m.name, info, opacity);
       });
-      ctx.globalAlpha = 1.0;
       requestAnimationFrame(renderLoop);
     }
 
@@ -265,10 +247,16 @@
         ctx.fillStyle = "white"; ctx.font = "12px Arial";
         cleanInfo.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + 15, bbox.y0 - totalH + 28 + (22 * (i+1))));
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1-bbox.x0, bbox.y1-bbox.y0);
+        ctx.globalAlpha = 1.0;
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
-    function toggleMenu(id) { const el = document.getElementById(id); const other = id === 'resMenu' ? 'modeMenu' : 'resMenu'; document.getElementById(other).style.display = 'none'; el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+    function toggleMenu(id) { 
+        const el = document.getElementById(id); 
+        const other = id === 'resMenu' ? 'modeMenu' : 'resMenu';
+        document.getElementById(other).style.display = 'none';
+        el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; 
+    }
     function setMode(m, el) { currentMode = m; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); el.style.color = '#34C759'; toggleMenu('modeMenu'); persistentMatches = []; }
   </script>
 </body>
