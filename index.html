@@ -79,4 +79,152 @@
       } catch (e) { alert("Camera Access Error"); }
     }
 
-    async function initAI() { worker = await Tesseract.
+    async function initAI() { worker = await Tesseract.createWorker('eng', 1); status.innerText = "Engine Ready"; }
+
+    async function loadSheetData() {
+      const resp = await fetch(GAS_URL, { redirect: 'follow' });
+      const data = await resp.json();
+      rawSheetData = data.master; logicRules = data.logic;
+      populateRestaurants();
+    }
+
+    function populateRestaurants() {
+      const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
+      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
+      setRes('GLOBAL');
+    }
+
+    function setRes(res) {
+      activeMenu = {}; currentRestaurant = res;
+      rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); } });
+      document.getElementById('resMenu').style.display = 'none';
+      status.innerText = res + " Brain Active";
+    }
+
+    function handleAction() {
+      if (appMode === 'Scan Wine List' && isScanning) { finalizeWine(); return; }
+      isScanning = !isScanning;
+      updateActionBtnUI();
+      if (isScanning) runScanLoop();
+      else ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+
+    function updateActionBtnUI() {
+        if (appMode === 'Scan Wine List') {
+            actionBtn.innerText = isScanning ? "FINISH WINE SCAN" : "START WINE INDEXING";
+            actionBtn.style.background = isScanning ? "#2196F3" : "#002d58";
+        } else {
+            actionBtn.innerText = isScanning ? "STOP LIVE SCAN" : "START LIVE MENU SCAN";
+            actionBtn.style.background = isScanning ? "#f44336" : "#34C759";
+        }
+    }
+
+    async function runScanLoop() {
+      if (!isScanning || !worker) return;
+      if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+      const off = document.createElement('canvas'); off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
+      off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
+      try {
+        const result = await worker.recognize(off);
+        if (appMode === 'Scan Wine List') {
+            result.data.lines.forEach(l => { if (clean(l.text).length > 7) wineListBuffer.add(l.text); });
+            status.innerText = `Indexing: ${wineListBuffer.size} items found`;
+        } else {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            processMatches(result.data.lines, 640, off.height);
+        }
+      } catch (e) {}
+      if (isScanning) setTimeout(runScanLoop, 450);
+    }
+
+    function finalizeWine() {
+      isScanning = false;
+      wineListRaw = Array.from(wineListBuffer).join('\n');
+      wineListTextClean = clean(wineListRaw);
+      const off = document.createElement('canvas'); off.width = 1000; off.height = video.videoHeight * (1000 / video.videoWidth);
+      off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: wineListRaw, type: 'Scan Wine List', restaurant: currentRestaurant }) });
+      appMode = 'Scan Menu'; updateActionBtnUI();
+      status.innerText = "Step 1 Stored. Scan Menu!";
+      handleAction();
+    }
+
+    // --- ENHANCED DUAL MATCHING LOGIC ---
+    function processMatches(lines, sw, sh) {
+      const sx = canvas.width / sw, sy = canvas.height / sh;
+      lines.forEach(line => {
+        const scanLineClean = clean(line.text);
+        
+        // 1. Specific Database View Match (Bistro Jeanty, etc)
+        if (currentRestaurant !== "GLOBAL") {
+            Object.keys(activeMenu).forEach(dishKey => {
+                const dishWords = dishKey.split(' ').filter(w => w.length > 3);
+                // LOOSE FOOD MATCH: 75% of unique words must exist
+                const matches = dishWords.filter(w => scanLineClean.includes(w)).length;
+                if (matches >= Math.ceil(dishWords.length * 0.75) && dishKey.length > 4) {
+                    const row = activeMenu[dishKey][0];
+                    let opts = (currentMode === 'somm' ? [row[3]] : currentMode === 'ai' ? [row[4], row[5]] : [row[7], row[8]]);
+                    const valid = opts.filter(w => isWineOnList(w));
+                    if (valid.length > 0) drawInfoBox(line.bbox, row[1], valid, sx, sy);
+                }
+            });
+        }
+
+        // 2. Fallback / Global Logic Rules Match
+        logicRules.slice(1).forEach(rule => {
+            const foodName = clean(rule[1]); 
+            const anchor = foodName.split(' ').sort((a,b) => b.length - a.length)[0]; 
+            if (scanLineClean.includes(anchor) && anchor.length > 3) {
+                let targetVar = (currentMode === 'somm' ? rule[3] : currentMode === 'ai' ? rule[4] + "," + rule[5] : rule[7] + "," + rule[8]);
+                const foundWines = findWineOnList(targetVar);
+                if (foundWines.length > 0) drawInfoBox(line.bbox, rule[1], foundWines, sx, sy);
+            }
+        });
+      });
+    }
+
+    function isWineOnList(wineRec) {
+        if(!wineRec || !wineListTextClean) return false;
+        // Search for any significant producer keyword (words > 4 chars)
+        const tokens = clean(wineRec).split(' ').filter(w => w.length > 4 && isNaN(w));
+        return tokens.some(t => wineListTextClean.includes(t));
+    }
+
+    function findWineOnList(vStr) {
+        if (!vStr || !wineListRaw) return [];
+        const targets = vStr.split(',').map(v => clean(v.trim())).filter(v => v.length > 3);
+        const listLines = wineListRaw.split('\n');
+        let res = [];
+        for (let line of listLines) {
+            const cL = clean(line);
+            for (let t of targets) { if (cL.includes(t)) { res.push(line.trim()); break; } }
+            if (res.length >= 2) break;
+        }
+        return res;
+    }
+
+    function drawInfoBox(bbox, name, infoList, sx, sy) {
+        const x = bbox.x0 * sx, y = bbox.y0 * sy;
+        ctx.font = "bold 14px Arial";
+        let maxW = ctx.measureText(name.toUpperCase()).width;
+        ctx.font = "12px Arial";
+        infoList.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
+        const boxW = maxW + 30, totalH = (infoList.length + 1) * 22 + 20;
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(x, y - totalH - 5, boxW, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), x + 15, y - totalH + 28);
+        ctx.fillStyle = "white"; ctx.font = "12px Arial";
+        [...new Set(infoList)].forEach((t, i) => ctx.fillText("• " + t, x + 15, y - totalH + 28 + (22 * (i+1))));
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(x, y, (bbox.x1-bbox.x0)*sx, (bbox.y1-bbox.y0)*sy);
+    }
+
+    function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
+    function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+    function setMode(m, el) { 
+        currentMode = m; 
+        document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); 
+        el.style.color = '#34C759'; 
+        toggleMenu('modeMenu'); 
+    }
+  </script>
+</body>
+</html>
