@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v4.5</title>
+  <title>Sommurai AR Pro v4.6</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
@@ -64,12 +64,12 @@
     let isScanning = false, persistentMatches = [], wineListBuffer = new Set();
     const DECAY_TIME = 5000;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycby2DZGK_E1TKLOVGOnh3QvvhTi2N-oJfaqRnlm8_f-rXRtbL3W1bW6cHqq1puqWiCWF/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwFXPBln1ARpyLVQBCRXIF0lOOFpKR8R9KarA0t6okLycF4ICzMq_2lrXSzfXT6SBJs/exec";
 
     async function startFlow(mode) {
       appMode = mode;
-      const cameraStarted = await initCamera();
-      if (cameraStarted) {
+      const camStarted = await initCamera();
+      if (camStarted) {
         document.getElementById('splash-screen').style.display = 'none';
         document.getElementById('menu-nav').style.display = 'flex';
         startOverBtn.style.display = 'block';
@@ -84,18 +84,15 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } }, audio: false });
         video.srcObject = stream;
-        return new Promise((resolve) => {
-          video.onloadedmetadata = () => { video.play().then(() => resolve(true)).catch(() => resolve(true)); };
-        });
+        return new Promise(r => video.onloadedmetadata = () => { video.play(); r(true); });
       } catch (e) { alert("Camera Access Error"); return false; }
     }
 
     async function initAI() {
-      if (worker) return;
       worker = await Tesseract.createWorker('eng', 1, {
-        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Analyzing: ${Math.round(m.progress * 100)}%`; }
+        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `AI Processing: ${Math.round(m.progress * 100)}%`; }
       });
-      status.innerText = "Sommurai Ready";
+      status.innerText = "Sommurai Engine Ready";
     }
 
     async function loadSheetData() {
@@ -119,14 +116,14 @@
       if(el) el.classList.add('active');
       rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = (res === 'GLOBAL') ? "Global Mode Active" : `${res} Menu Active`;
+      status.innerText = (res === 'GLOBAL') ? "Global Database Active" : `${res} Menu Active`;
     }
 
     function handleAction() {
       if (appMode === 'Scan Wine List' && isScanning) { finalizeWineScan(); return; }
       isScanning = !isScanning;
       updateActionButton();
-      if (isScanning) runAutoScan();
+      if (isScanning) runScanLoop();
       else persistentMatches = [];
     }
 
@@ -140,48 +137,44 @@
         }
     }
 
-    async function runAutoScan() {
+    async function runScanLoop() {
       if (!isScanning || !worker) return;
-      if (video.paused) video.play().catch(()=>{});
-      const off = document.createElement('canvas'); 
-      off.width = 640; 
-      off.height = video.videoHeight * (640 / video.videoWidth);
+      const off = document.createElement('canvas'); off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       try { 
           const result = await worker.recognize(off); 
           if (appMode === 'Scan Wine List') processWineLines(result.data.lines, off.width, off.height);
           else updateFoodBuffer(result.data.lines, off.width, off.height); 
       } catch (e) {}
-      if (isScanning) setTimeout(runAutoScan, 400);
+      if (isScanning) setTimeout(runScanLoop, 450);
     }
 
-    function processWineLines(lines, scanW, scanH) {
-      const now = Date.now(), scaleX = canvas.width / scanW, scaleY = canvas.height / scanH;
-      lines.forEach(line => {
-        const txt = clean(line.text);
-        if (txt.length > 7) {
-            wineListBuffer.add(line.text);
-            const scaledBbox = { x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY, x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY };
-            const idx = persistentMatches.findIndex(m => m.itemName === txt.substring(0,12));
+    function processWineLines(lines, sw, sh) {
+      const now = Date.now(), sx = canvas.width / sw, sy = canvas.height / sh;
+      lines.forEach(l => {
+        const txt = clean(l.text);
+        if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot') || txt.includes('glass'))) {
+            wineListBuffer.add(l.text);
+            const scaledBbox = { x0: l.bbox.x0 * sx, y0: l.bbox.y0 * sy, x1: l.bbox.x1 * sx, y1: l.bbox.y1 * sy };
+            const idx = persistentMatches.findIndex(m => m.itemName === txt.substring(0,10));
             if (idx > -1) { persistentMatches[idx].lastSeen = now; }
-            else { persistentMatches.push({ itemName: txt.substring(0,12), bbox: scaledBbox, isDrinkHighlight: true, lastSeen: now }); }
+            else { persistentMatches.push({ itemName: txt.substring(0,10), bbox: scaledBbox, isDrinkHighlight: true, lastSeen: now }); }
         }
       });
-      status.innerText = `Indexing: ${wineListBuffer.size} drinks cached`;
+      status.innerText = `Indexed: ${wineListBuffer.size} drinks cached`;
     }
 
     function finalizeWineScan() {
       lastScannedWineText = clean(Array.from(wineListBuffer).join(' '));
       const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      const base64 = off.toDataURL('image/jpeg', 0.5);
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) }).catch(e => console.log("Bg upload silent"));
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
       isScanning = false;
       appMode = 'Scan Menu';
       updateActionButton();
       persistentMatches = [];
       wineListBuffer.clear();
-      status.innerText = "Wine Index Stored. Scan Menu!";
+      status.innerText = "Wine Index Saved. Scan Menu!";
       handleAction(); 
     }
 
@@ -191,20 +184,18 @@
         const scanText = clean(line.text);
         Object.keys(activeMenu).forEach(key => {
           
-          // --- STRICT FOOD MATCHING LOGIC ---
+          // --- STRICT FOOD MATCHING ---
           const dbTokens = key.split(' ').filter(k => k.length > 3);
           const matchCount = dbTokens.filter(token => scanText.includes(token)).length;
           
-          // Match if 85% of unique words in DB dish name are found in scanned line
           if (matchCount >= Math.ceil(dbTokens.length * 0.85) && key.length > 4) {
             const rows = activeMenu[key];
             rows.forEach(row => {
               let wines = (currentMode === "somm") ? [row[3]] : (currentMode === "ai") ? [row[4], row[5]] : (currentMode === "expert") ? [row[7], row[8], row[9]] : [row[10], row[11], row[12]];
               
-              // --- STRICT WINE FILTERING LOGIC ---
+              // --- STRICT WINE FILTERING ---
               const valid = wines.filter(w => {
                   if(!w || !lastScannedWineText) return false;
-                  // Take the first significant word (Producer) of the wine recommendation
                   const producer = clean(w).split(' ').find(word => word.length > 4);
                   return producer && lastScannedWineText.includes(producer);
               });
@@ -228,20 +219,18 @@
           const now = Date.now();
           persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
           persistentMatches.forEach(m => {
-            const age = now - m.lastSeen;
-            const opacity = (DECAY_TIME - age) / 1000;
-            if (m.isDrinkHighlight) drawWineHighlight(m.bbox, opacity);
-            else drawFoodOverlay(m.bbox, m.itemName, m.displayData, opacity);
+            const opacity = (DECAY_TIME - (now - m.lastSeen)) / 1000;
+            if (m.isDrinkHighlight) {
+                ctx.globalAlpha = Math.min(opacity, 0.4);
+                ctx.strokeStyle = "#34C759"; ctx.lineWidth = 4;
+                ctx.strokeRect(m.bbox.x0, m.bbox.y0, m.bbox.x1 - m.bbox.x0, m.bbox.y1 - m.bbox.y0);
+            } else {
+                drawFoodOverlay(m.bbox, m.itemName, m.displayData, opacity);
+            }
           });
+          ctx.globalAlpha = 1.0;
       }
       requestAnimationFrame(renderLoop);
-    }
-
-    function drawWineHighlight(bbox, opacity) {
-        ctx.globalAlpha = Math.min(opacity, 0.4);
-        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 4;
-        ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-        ctx.globalAlpha = 1.0;
     }
 
     function drawFoodOverlay(bbox, name, infoList, opacity) {
@@ -258,7 +247,6 @@
         const unique = [...new Set(infoList)];
         unique.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-        ctx.globalAlpha = 1.0;
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
