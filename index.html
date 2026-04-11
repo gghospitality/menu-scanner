@@ -3,30 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v5.8</title>
+  <title>Sommurai AR Pro v5.9</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
+    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
     .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; }
-    #splash-screen img { width: 220px; height: auto; margin-bottom: 20px; flex-shrink: 0; }
     #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; z-index: 1; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 5; }
     #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
     .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
     .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 11px; z-index: 5000; display: none; font-weight: bold; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; }
     #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
     .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; transition: 0.2s; }
-    #version-tag { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #444; }
   </style>
 </head>
 <body>
 
-  <div id="version-tag">v5.8</div>
+  <div id="version-tag" style="position:fixed; bottom:10px; right:10px; font-size:10px; color:#444;">v5.9</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
@@ -35,20 +33,20 @@
         <button class="splash-btn" style="background:#34C759" onclick="startFlow('Scan Menu')">STEP 2: SCAN FOOD MENU</button>
         <button class="splash-btn" style="background:#444" onclick="startFlow('Menu List')">DATABASE VIEW</button>
     </div>
-    <img src="logo.png" alt="Sommurai Logo">
+    <img src="logo.png" style="width:220px">
   </div>
 
   <div id="menu-nav">
     <div class="menu-group"><div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div><div id="resMenu" class="menu-content"></div></div>
     <div class="menu-group" id="logic-trigger"><div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div><div id="modeMenu" class="menu-content">
-        <div class="menu-item active" onclick="setMode('somm', this)" style="color:#34C759; padding:15px; border-bottom:1px solid #333;">Somm Pick</div>
+        <div class="menu-item" onclick="setMode('somm', this)" style="color:#34C759; padding:15px; border-bottom:1px solid #333;">Somm Pick</div>
         <div class="menu-item" onclick="setMode('ai', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">AI Somm Pick</div>
         <div class="menu-item" onclick="setMode('expert', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">Expert</div>
         <div class="menu-item" onclick="setMode('basic', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">Basic</div>
     </div></div>
   </div>
 
-  <div id="status">Syncing Data...</div>
+  <div id="status">Syncing...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -57,42 +55,39 @@
     const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
     let rawSheetData = [], logicRules = [], activeMenu = {}, currentMode = 'somm', appMode = '';
-    let worker = null, wineListRaw = "", isScanning = false, persistentMatches = [];
+    let worker = null, wineListRaw = "", wineListTextClean = "", isScanning = false;
     let wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
-    const DECAY_TIME = 6000;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxG5Nu8G8B-HCJDSHMI1MDBy5yNeUJmgJ5y3JsiUYJ5UE82_jrtzkW-LNZIqRNIgmfc/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbysAhu_-2Udloov8zvwgQQVSWKfWL9XaslfKo0zkP0LxTPRn9cxfPoOrsZi6UUuvPeb/exec";
 
     async function startFlow(mode) {
       appMode = mode;
-      document.getElementById('splash-screen').style.display = 'none';
-      document.getElementById('menu-nav').style.display = 'flex';
-      startOverBtn.style.display = 'block';
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
-      video.srcObject = stream;
-      video.onloadedmetadata = () => { video.play(); };
-
-      updateActionBtnUI();
-      loadSheetData();
-      initAI();
+      const cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+      video.srcObject = cam;
+      video.onloadedmetadata = () => {
+          video.play();
+          document.getElementById('splash-screen').style.display = 'none';
+          document.getElementById('menu-nav').style.display = 'flex';
+          startOverBtn.style.display = 'block';
+          updateActionBtnUI();
+          loadSheetData();
+          initAI();
+      };
     }
 
     async function initAI() {
       worker = await Tesseract.createWorker('eng', 1);
-      status.innerText = "Sommurai Engine Ready";
+      status.innerText = "Sommurai Ready";
     }
 
     async function loadSheetData() {
-      const r = await fetch(GAS_URL, { redirect: 'follow' });
-      const data = await r.json();
-      rawSheetData = data.master || [];
-      logicRules = data.logic || [];
+      const resp = await fetch(GAS_URL, { redirect: 'follow' });
+      const data = await resp.json();
+      rawSheetData = data.master; logicRules = data.logic;
       populateRestaurants();
     }
 
     function populateRestaurants() {
-      if (!rawSheetData.length) return;
       const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
       document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Database</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
       setRes('GLOBAL');
@@ -125,81 +120,68 @@
 
     async function runScanLoop() {
       if (!isScanning || !worker) return;
-      const off = document.createElement('canvas'); 
-      off.width = 800; off.height = video.videoHeight * (800 / video.videoWidth);
+      if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+      const off = document.createElement('canvas'); off.width = 800; off.height = video.videoHeight * (800 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       
       try {
         const result = await worker.recognize(off);
         if (appMode === 'Scan Wine List') {
-            result.data.lines.forEach(l => {
-                if (clean(l.text).length > 8) wineListBuffer.add(l.text);
-            });
-            status.innerText = `Indexing: ${wineListBuffer.size} items found`;
+            result.data.lines.forEach(l => { if (clean(l.text).length > 7) wineListBuffer.add(l.text); });
+            status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
         } else {
             ctx.clearRect(0,0,canvas.width,canvas.height);
             processMatches(result.data.lines, 800, off.height);
         }
       } catch (e) {}
-      if (isScanning) setTimeout(runScanLoop, 500);
+      if (isScanning) setTimeout(runScanLoop, 450);
     }
 
     function finalizeWine() {
       isScanning = false;
       wineListRaw = Array.from(wineListBuffer).join('\n');
+      wineListTextClean = clean(wineListRaw);
       const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: wineListRaw, type: 'Scan Wine List', restaurant: currentRestaurant }) });
-      appMode = 'Scan Menu'; updateActionBtnUI();
-      status.innerText = "Step 1 Stored. Scan Menu!";
+      appMode = 'Scan Menu'; persistentMatches = []; updateActionBtnUI();
+      status.innerText = "Memory Stored. Scan Menu!";
       handleAction();
     }
 
+    // --- ENHANCED LOGIC ENGINE ---
     function processMatches(lines, sw, sh) {
       const sx = canvas.width / sw, sy = canvas.height / sh;
       lines.forEach(line => {
-        const scanText = clean(line.text);
+        const scanLineClean = clean(line.text);
         
         logicRules.slice(1).forEach(rule => {
-            const foodName = clean(rule[0]);
-            const foodWords = foodName.split(' ').filter(w => w.length > 3);
+            const foodName = clean(rule[1]); // Column B: Food Name
+            const anchorWord = foodName.split(' ').sort((a,b) => b.length - a.length)[0]; // Longest word
             
-            // Loose food match: all important words of the rule must exist in the menu line
-            const foodMatches = foodWords.every(word => scanText.includes(word));
-
-            if (foodMatches && foodName.length > 4) {
-                let targetVarietal = "";
-                if (currentMode === 'somm') targetVarietal = rule[3];
-                else if (currentMode === 'ai') targetVarietal = rule[4] + "," + rule[5];
-                else if (currentMode === 'expert') targetVarietal = rule[7] + "," + rule[8];
-                else if (currentMode === 'basic') targetVarietal = rule[10];
-                
-                const foundWines = findWinesOnList(targetVarietal);
-                if (foundWines.length > 0) {
-                    drawInfoBox(line.bbox, foodName, foundWines, sx, sy);
-                }
+            // Anchor Match: If the longest word of the dish is present, proceed
+            if (scanLineClean.includes(anchorWord) && anchorWord.length > 3) {
+                let targetVar = (currentMode === 'somm' ? rule[3] : currentMode === 'ai' ? rule[4] + "," + rule[5] : rule[7] + "," + rule[8]);
+                const foundWines = findWineMatches(targetVar);
+                if (foundWines.length > 0) drawInfoBox(line.bbox, rule[1], foundWines, sx, sy);
             }
         });
       });
     }
 
-    function findWinesOnList(vStr) {
+    function findWineMatches(vStr) {
         if (!vStr || !wineListRaw) return [];
         const targets = vStr.split(',').map(v => clean(v.trim())).filter(v => v.length > 3);
         const listLines = wineListRaw.split('\n');
-        let matches = [];
-        
+        let results = [];
         for (let line of listLines) {
-            const cleanLine = clean(line);
+            const cleanL = clean(line);
             for (let t of targets) {
-                if (cleanLine.includes(t)) {
-                    matches.push(line.trim());
-                    break; 
-                }
+                if (cleanL.includes(t)) { results.push(line.trim()); break; }
             }
-            if (matches.length >= 2) break; // Limit to 2 suggestions
+            if (results.length >= 2) break;
         }
-        return matches;
+        return results;
     }
 
     function drawInfoBox(bbox, name, infoList, sx, sy) {
@@ -218,17 +200,7 @@
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
     function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
-    function setMode(m, el) { 
-        currentMode = m; 
-        document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); 
-        el.style.color = '#34C759'; 
-        toggleMenu('modeMenu'); 
-    }
-    
-    function renderLoop() {
-        if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-        requestAnimationFrame(renderLoop); 
-    }
+    function setMode(m, el) { currentMode = m; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); el.style.color = '#34C759'; toggleMenu('modeMenu'); }
   </script>
 </body>
 </html>
