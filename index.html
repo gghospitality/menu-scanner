@@ -3,36 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v4.9</title>
+  <title>Sommurai AR Pro v5.0</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
-    
+    body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
     .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; }
-    
-    #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; display: flex; }
+    #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; z-index: 1; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 5; }
-    
     #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
     .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
     .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
-    
-    #status { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); width: 70%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 13px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 8px 20px; border-radius: 20px; font-size: 11px; z-index: 5000; display: none; font-weight: bold; }
-
-    #controls { 
-        height: 180px; background: #1a1a1a; 
-        display: flex; flex-direction: column; justify-content: center; align-items: center; 
-        padding-bottom: 50px; border-top: 1px solid #333; z-index: 1000; 
-    }
-    .main-btn { padding: 22px 0; font-size: 20px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+    .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 80%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
+    #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
+    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; }
+    #version-tag { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #444; }
   </style>
 </head>
 <body>
 
+  <div id="version-tag">v5.0</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
@@ -40,16 +34,16 @@
         <button class="splash-btn" onclick="startFlow('Scan Wine List')">STEP 1: SCAN WINE LIST</button>
         <button class="splash-btn" style="background:#34C759" onclick="startFlow('Scan Menu')">STEP 2: SCAN FOOD MENU</button>
     </div>
-    <img src="logo.png" style="width:250px">
+    <img src="logo.png" alt="Sommurai Logo">
   </div>
 
   <div id="menu-nav">
     <div class="menu-group"><div class="menu-trigger" onclick="toggleMenu('resMenu')">🍴</div><div id="resMenu" class="menu-content"></div></div>
     <div class="menu-group" id="logic-trigger"><div class="menu-trigger" onclick="toggleMenu('modeMenu')">💡</div><div id="modeMenu" class="menu-content">
-        <div class="menu-item" onclick="setMode('somm', this)" style="color:#34C759; padding:15px; border-bottom:1px solid #333;">Somm Pick (D)</div>
-        <div class="menu-item" onclick="setMode('ai', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">AI Somm Pick (E,F)</div>
-        <div class="menu-item" onclick="setMode('expert', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">Expert (H,I,J)</div>
-        <div class="menu-item" onclick="setMode('basic', this)" style="color:#ccc; padding:15px; border-bottom:1px solid #333;">Basic (K,L,M)</div>
+        <div class="menu-item active" onclick="setMode('somm', this)" style="color:#34C759">Somm Pick (D)</div>
+        <div class="menu-item" onclick="setMode('ai', this)">AI Somm Pick (E,F)</div>
+        <div class="menu-item" onclick="setMode('expert', this)">Expert (H,I,J)</div>
+        <div class="menu-item" onclick="setMode('basic', this)">Basic (K,L,M)</div>
     </div></div>
   </div>
 
@@ -61,10 +55,10 @@
     const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
     const status = document.getElementById('status'), actionBtn = document.getElementById('actionBtn'), startOverBtn = document.getElementById('startOverBtn');
     
-    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null;
-    let wineListText = "", isScanning = false, wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
+    let rawSheetData = [], activeMenu = {}, currentMode = 'somm', appMode = '', worker = null, lastScannedWineText = "";
+    let isScanning = false, persistentMatches = [], wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbyHzT__CNt0S3b08oKn0zcdEFajuyWLOLFL5yBJ9GC6DWbLexhjWzn4l7H6Y7Y-5rcm/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxo5HmZj49I90YLnF6HWfLOmBp4ofXV2zlaMnp4askEoaVgs-dTQTsIzTKknjRC1Ng6/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -81,26 +75,28 @@
 
     async function initCamera() {
       try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
-        video.srcObject = s;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+        video.srcObject = stream;
         return new Promise(r => video.onloadedmetadata = () => { video.play(); r(true); });
       } catch (e) { alert("Camera Access Error"); return false; }
     }
 
     async function initAI() {
-      worker = await Tesseract.createWorker('eng', 1);
+      worker = await Tesseract.createWorker('eng', 1, {
+        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Thinking: ${Math.round(m.progress * 100)}%`; }
+      });
       status.innerText = "Engine Ready";
     }
 
     async function loadSheetData() {
-      const r = await fetch(GAS_URL, { redirect: 'follow' });
-      rawSheetData = await r.json();
+      const resp = await fetch(GAS_URL, { redirect: 'follow' });
+      rawSheetData = await resp.json();
       populateRestaurants();
     }
 
     function populateRestaurants() {
       const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
-      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Database</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
+      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')">🌎 Global Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')">${r}</div>`).join('');
       setRes('GLOBAL');
     }
 
@@ -108,7 +104,7 @@
       activeMenu = {}; currentRestaurant = res;
       rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = res + " Brain Active";
+      status.innerText = res + " Expert Knowledge Active";
     }
 
     function handleAction() {
@@ -124,7 +120,7 @@
         actionBtn.innerText = isScanning ? "FINISH WINE SCAN" : "START WINE INDEXING";
         actionBtn.style.background = isScanning ? "#2196F3" : "#002d58";
       } else {
-        actionBtn.innerText = isScanning ? "STOP LIVE SCAN" : "START LIVE MENU SCAN";
+        actionBtn.innerText = isScanning ? "STOP LIVE MENU SCAN" : "START LIVE MENU SCAN";
         actionBtn.style.background = isScanning ? "#f44336" : "#34C759";
       }
     }
@@ -139,13 +135,13 @@
         if (appMode === 'Scan Wine List') {
             result.data.lines.forEach(l => {
                 const txt = clean(l.text);
-                if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot'))) {
+                if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot') || txt.includes('glass'))) {
                     wineListBuffer.add(l.text);
                     ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3;
                     ctx.strokeRect(l.bbox.x0*(canvas.width/640), l.bbox.y0*(canvas.height/off.height), (l.bbox.x1-l.bbox.x0)*(canvas.width/640), (l.bbox.y1-l.bbox.y0)*(canvas.height/off.height));
                 }
             });
-            status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
+            status.innerText = `Indexed: ${wineListBuffer.size} drinks found`;
         } else {
             ctx.clearRect(0,0,canvas.width,canvas.height);
             processFoodMatches(result.data.lines, 640, off.height);
@@ -169,21 +165,28 @@
       lines.forEach(line => {
         const scanText = clean(line.text);
         Object.keys(activeMenu).forEach(key => {
-          // HYPER-STRICT MATCH: Every word in the DB name must appear in the scanned line
-          const dbWords = key.split(' ').filter(w => w.length > 3);
-          const allWordsPresent = dbWords.every(word => scanText.includes(word));
           
-          if (allWordsPresent && key.length > 4) {
+          // --- HYPER-STRICT FOOD MATCHING ---
+          // Requirement: Every single word in the spreadsheet item must appear in the scanned line
+          const dbWords = key.split(' ').filter(w => w.length > 3 && w !== "with");
+          const allWordsMatch = dbWords.every(word => scanText.includes(word));
+          
+          if (allWordsMatch && key.length > 4) {
             const rows = activeMenu[key];
-            let opts = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
+            let options = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
             
-            const valid = opts.filter(w => {
-                if(!w || !wineListText) return false;
-                const producer = clean(w).split(' ').find(word => word.length > 4);
+            // --- PRODUCER-LEVEL WINE FILTERING ---
+            const valid = options.filter(wineRec => {
+                if(!wineRec || !wineListText) return false;
+                // Take the producer name (usually the 1st word or 1st + 2nd word)
+                const tokens = clean(wineRec).split(' ').filter(t => t.length > 4 && isNaN(t));
+                const producer = tokens[0];
                 return producer && wineListText.includes(producer);
             });
             
-            if (valid.length > 0) drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
+            if (valid.length > 0) {
+               drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
+            }
           }
         });
       });
@@ -200,6 +203,7 @@
         ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), x + 15, y - totalH + 28);
         ctx.fillStyle = "white"; ctx.font = "12px Arial";
         [...new Set(infoList)].forEach((t, i) => ctx.fillText("• " + t, x + 15, y - totalH + 28 + (22 * (i+1))));
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(x, y, (bbox.x1-bbox.x0)*sx, (bbox.y1-bbox.y0)*sy);
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
