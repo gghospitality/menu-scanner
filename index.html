@@ -3,41 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v4.6</title>
+  <title>Sommurai AR Pro v4.7</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; }
-    #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
+    #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
-    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-    .btn-blue { background: #002d58; }
-    .btn-green { background: #34C759; }
-    #splash-screen img { width: 70%; max-width: 300px; }
+    .splash-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 18px; cursor: pointer; color: white; background: #002d58; }
     #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 5; pointer-events: none; }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 5; }
     #menu-nav { position: fixed; top: 50px; left: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 3000; display: none; }
-    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; }
-    .menu-content { position: absolute; left: 60px; top: 0; background: rgba(25, 25, 25, 0.98); border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
+    .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
     .menu-item { padding: 16px; border-bottom: 1px solid #333; font-size: 14px; }
-    .menu-item.active { border-left: 5px solid #34C759; background: #222; font-weight: bold; }
     #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
-    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; }
     #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
-    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    .spinner { border: 2px solid #333; border-top: 2px solid #34C759; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .main-btn { padding: 20px 40px; font-size: 18px; border-radius: 35px; border: none; font-weight: bold; width: 85%; background: #34C759; color: white; transition: 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 8px 20px; border-radius: 15px; font-size: 10px; z-index: 5000; display: none; font-weight: bold; }
+    #version-tag { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #444; }
   </style>
 </head>
 <body>
 
+  <div id="version-tag">v4.7</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
     <div id="splash-buttons">
-        <button class="splash-btn btn-blue" onclick="startFlow('Scan Wine List')">STEP 1: LIVE WINE INDEX</button>
-        <button class="splash-btn btn-blue" onclick="startFlow('Scan Menu')">SKIP TO FOOD SCAN</button>
-        <button class="splash-btn btn-green" onclick="startFlow('Menu List')">DATABASE VIEW</button>
+        <button class="splash-btn btn-blue" onclick="startFlow('Scan Wine List')">STEP 1: SCAN WINE LIST</button>
+        <button class="splash-btn btn-blue" style="background:#34C759" onclick="startFlow('Scan Menu')">SKIP TO FOOD SCAN</button>
     </div>
     <img src="logo.png" alt="Sommurai Logo">
   </div>
@@ -64,12 +59,12 @@
     let isScanning = false, persistentMatches = [], wineListBuffer = new Set();
     const DECAY_TIME = 5000;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwFXPBln1ARpyLVQBCRXIF0lOOFpKR8R9KarA0t6okLycF4ICzMq_2lrXSzfXT6SBJs/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzr0vNCrPpC6ZuT9a5oX3HCG5OABKqNonHeOiCP1JMExxGgcD2QnKq8BS9JB-MeYhtw/exec";
 
     async function startFlow(mode) {
       appMode = mode;
-      const camStarted = await initCamera();
-      if (camStarted) {
+      const cameraStarted = await initCamera();
+      if (cameraStarted) {
         document.getElementById('splash-screen').style.display = 'none';
         document.getElementById('menu-nav').style.display = 'flex';
         startOverBtn.style.display = 'block';
@@ -84,15 +79,18 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } }, audio: false });
         video.srcObject = stream;
-        return new Promise(r => video.onloadedmetadata = () => { video.play(); r(true); });
+        return new Promise((resolve) => {
+          video.onloadedmetadata = () => { video.play().then(() => resolve(true)).catch(() => resolve(true)); };
+        });
       } catch (e) { alert("Camera Access Error"); return false; }
     }
 
     async function initAI() {
+      if (worker) return;
       worker = await Tesseract.createWorker('eng', 1, {
-        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `AI Processing: ${Math.round(m.progress * 100)}%`; }
+        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Analyzing: ${Math.round(m.progress * 100)}%`; }
       });
-      status.innerText = "Sommurai Engine Ready";
+      status.innerText = "Sommurai Ready";
     }
 
     async function loadSheetData() {
@@ -116,11 +114,14 @@
       if(el) el.classList.add('active');
       rawSheetData.slice(1).forEach(row => { if (res === 'GLOBAL' || row[0] === res) { const item = clean(row[1]); if (!activeMenu[item]) activeMenu[item] = []; activeMenu[item].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
-      status.innerText = (res === 'GLOBAL') ? "Global Database Active" : `${res} Menu Active`;
+      status.innerText = (res === 'GLOBAL') ? "Expert Knowledge Active" : `${res} Menu Active`;
     }
 
     function handleAction() {
-      if (appMode === 'Scan Wine List' && isScanning) { finalizeWineScan(); return; }
+      if (appMode === 'Scan Wine List' && isScanning) {
+          finalizeWineScan();
+          return;
+      }
       isScanning = !isScanning;
       updateActionButton();
       if (isScanning) runScanLoop();
@@ -130,7 +131,7 @@
     function updateActionButton() {
         if (appMode === 'Scan Wine List') {
             actionBtn.innerText = isScanning ? "FINISH WINE SCAN" : "START WINE INDEXING";
-            actionBtn.style.background = isScanning ? "#2196F3" : "#34C759";
+            actionBtn.style.background = isScanning ? "#2196F3" : "#002d58";
         } else {
             actionBtn.innerText = isScanning ? "STOP LIVE SCAN" : "START LIVE MENU SCAN";
             actionBtn.style.background = isScanning ? "#f44336" : "#34C759";
@@ -139,42 +140,50 @@
 
     async function runScanLoop() {
       if (!isScanning || !worker) return;
-      const off = document.createElement('canvas'); off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
+      if (video.paused) video.play().catch(()=>{});
+
+      const off = document.createElement('canvas'); 
+      off.width = 640; off.height = video.videoHeight * (640 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
+      
       try { 
           const result = await worker.recognize(off); 
           if (appMode === 'Scan Wine List') processWineLines(result.data.lines, off.width, off.height);
           else updateFoodBuffer(result.data.lines, off.width, off.height); 
       } catch (e) {}
-      if (isScanning) setTimeout(runScanLoop, 450);
+      
+      if (isScanning) setTimeout(runScanLoop, 400);
     }
 
     function processWineLines(lines, sw, sh) {
       const now = Date.now(), sx = canvas.width / sw, sy = canvas.height / sh;
-      lines.forEach(l => {
-        const txt = clean(l.text);
-        if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot') || txt.includes('glass'))) {
-            wineListBuffer.add(l.text);
-            const scaledBbox = { x0: l.bbox.x0 * sx, y0: l.bbox.y0 * sy, x1: l.bbox.x1 * sx, y1: l.bbox.y1 * sy };
+      lines.forEach(line => {
+        const txt = clean(line.text);
+        if (txt.length > 7) {
+            wineListBuffer.add(line.text);
+            const scaledBbox = { x0: line.bbox.x0 * sx, y0: line.bbox.y0 * sy, x1: line.bbox.x1 * sx, y1: line.bbox.y1 * sy };
             const idx = persistentMatches.findIndex(m => m.itemName === txt.substring(0,10));
             if (idx > -1) { persistentMatches[idx].lastSeen = now; }
             else { persistentMatches.push({ itemName: txt.substring(0,10), bbox: scaledBbox, isDrinkHighlight: true, lastSeen: now }); }
         }
       });
-      status.innerText = `Indexed: ${wineListBuffer.size} drinks cached`;
+      status.innerText = `Indexing: ${wineListBuffer.size} items found`;
     }
 
     function finalizeWineScan() {
       lastScannedWineText = clean(Array.from(wineListBuffer).join(' '));
       const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
-      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
+      const base64 = off.toDataURL('image/jpeg', 0.5);
+      
+      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: base64, ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) }).catch(e => {});
+
       isScanning = false;
       appMode = 'Scan Menu';
       updateActionButton();
       persistentMatches = [];
       wineListBuffer.clear();
-      status.innerText = "Wine Index Saved. Scan Menu!";
+      status.innerText = "Step 1 Complete. Scan Menu!";
       handleAction(); 
     }
 
@@ -184,16 +193,16 @@
         const scanText = clean(line.text);
         Object.keys(activeMenu).forEach(key => {
           
-          // --- STRICT FOOD MATCHING ---
-          const dbTokens = key.split(' ').filter(k => k.length > 3);
-          const matchCount = dbTokens.filter(token => scanText.includes(token)).length;
+          // --- STRICT FOOD MATCHING: At least 90% of words in DB item must appear in scanned line ---
+          const dbWords = key.split(' ').filter(w => w.length > 3);
+          const matchCount = dbWords.filter(w => scanText.includes(w)).length;
           
-          if (matchCount >= Math.ceil(dbTokens.length * 0.85) && key.length > 4) {
+          if (matchCount >= dbWords.length && key.length > 4) {
             const rows = activeMenu[key];
             rows.forEach(row => {
               let wines = (currentMode === "somm") ? [row[3]] : (currentMode === "ai") ? [row[4], row[5]] : (currentMode === "expert") ? [row[7], row[8], row[9]] : [row[10], row[11], row[12]];
               
-              // --- STRICT WINE FILTERING ---
+              // --- STRICT WINE FILTERING: Recommended wine MUST be in the wine list memory ---
               const valid = wines.filter(w => {
                   if(!w || !lastScannedWineText) return false;
                   const producer = clean(w).split(' ').find(word => word.length > 4);
@@ -244,8 +253,7 @@
         ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
         ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
         ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
-        const unique = [...new Set(infoList)];
-        unique.forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
+        [...new Set(infoList)].forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
         ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
     }
 
