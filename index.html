@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sommurai AR Pro v8.4</title>
+  <title>Sommurai AR Pro v8.5</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root { --ios-safe: env(safe-area-inset-bottom); }
@@ -18,7 +18,7 @@
     #menu-nav { position: fixed; top: 50px; left: 15px; display: none; flex-direction: column; gap: 15px; z-index: 3000; }
     .menu-trigger { background: rgba(40,40,40,0.95); border: 1px solid #555; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
     .menu-content { position: absolute; left: 60px; top: 0; background: #1a1a1a; border: 1px solid #444; border-radius: 15px; display: none; flex-direction: column; min-width: 220px; max-height: 400px; overflow-y: auto; }
-    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 11px; z-index: 4000; border: 1px solid #34C759; font-weight: bold; pointer-events: none; }
+    #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 11px; z-index: 4000; border: 1px solid #34C759; font-weight: bold; }
     #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; }
     #controls { min-height: 180px; background: #1a1a1a; display: none; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 120px; border-top: 1px solid #333; z-index: 1000; }
     .app-active #controls { display: flex !important; }
@@ -28,7 +28,7 @@
 </head>
 <body id="body-tag">
 
-  <div id="version-tag" style="position:fixed; bottom:10px; right:10px; font-size:10px; color:#444; z-index:50;">v8.4</div>
+  <div id="version-tag" style="position:fixed; bottom:10px; right:10px; font-size:10px; color:#444; z-index:50;">v8.5</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
@@ -50,7 +50,7 @@
     </div></div>
   </div>
 
-  <div id="status">Syncing...</div>
+  <div id="status">Syncing Data...</div>
   <div id="container"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
   <div id="controls"><button id="actionBtn" class="main-btn" onclick="handleAction()">ACTION</button></div>
 
@@ -60,9 +60,10 @@
     
     let rawSheetData = [], logicRules = [], activeMenu = {}, currentMode = 'somm', appMode = '';
     let worker = null, wineListRaw = "", wineListTextClean = "", isScanning = false, currentRestaurant = "GLOBAL";
-    let wineListBuffer = new Set();
+    let wineListBuffer = new Set(), persistentMatches = [];
+    const DECAY_TIME = 4500; 
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzoh6wgBv-hfNaA1s0AnKovb4J3wzIcRC5oY8em9EQOsWFoctltePM_1lifg_T9LgQt/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwdLMS2MmlqRQgUEDtG95wU-KzqYGkEon2pL1pvg-McQwSjWDE_PIHy0vxxfIWbJuDf/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -74,6 +75,7 @@
         const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
         video.srcObject = s; video.onloadedmetadata = () => video.play();
         loadSheetData(); initAI();
+        requestAnimationFrame(renderLoop);
       } catch (e) { alert("Camera Error"); }
     }
 
@@ -88,20 +90,16 @@
 
     function populateRestaurants() {
       const list = [...new Set(rawSheetData.slice(1).map(r => r[0]))].filter(r => r).sort();
-      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global expert Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"\\'")}')" style="padding:15px; border-bottom:1px solid #333;">${r}</div>`).join('');
+      document.getElementById('resMenu').innerHTML = `<div class="menu-item" onclick="setRes('GLOBAL')" style="padding:15px; border-bottom:1px solid #333;">🌎 Global Mode</div>` + list.map(r => `<div class="menu-item" onclick="setRes('${r.replace(/'/g,"")}')">${r}</div>`).join('');
       setRes('GLOBAL');
     }
 
     function setRes(res) {
       activeMenu = {}; currentRestaurant = res;
-      // Pre-group rows by dish name to prevent duplicates
-      rawSheetData.slice(1).forEach(row => { 
-        if (res === 'GLOBAL' || row[0] === res) { 
-          const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); 
-        } 
-      });
+      rawSheetData.slice(1).forEach(row => { if (row[0] === res) { const k = clean(row[1]); if (!activeMenu[k]) activeMenu[k] = []; activeMenu[k].push(row); } });
       document.getElementById('resMenu').style.display = 'none';
       status.innerText = res + " Active";
+      persistentMatches = []; 
     }
 
     function handleAction() {
@@ -109,7 +107,7 @@
       isScanning = !isScanning;
       updateActionBtnUI();
       if (isScanning) runScanLoop();
-      else ctx.clearRect(0,0,canvas.width,canvas.height);
+      else persistentMatches = [];
     }
 
     function updateActionBtnUI() {
@@ -133,8 +131,7 @@
             result.data.lines.forEach(l => { if (clean(l.text).length > 7) wineListBuffer.add(l.text); });
             status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
         } else {
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            processMatches(result.data.lines, 640, off.height);
+            updateBuffer(result.data.lines, 640, off.height);
         }
       } catch (e) {}
       if (isScanning) setTimeout(runScanLoop, 500);
@@ -146,55 +143,50 @@
       const off = document.createElement('canvas'); off.width = 1000; off.height = video.videoHeight * (1000 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: wineListRaw, type: 'Scan Wine List', restaurant: currentRestaurant }) });
-      appMode = 'Scan Menu'; updateActionBtnUI();
-      status.innerText = "Step 1 Stored. Scan Menu!";
+      appMode = 'Scan Menu'; persistentMatches = []; updateActionBtnUI();
+      status.innerText = "Memory Stored. Scan Menu!";
       handleAction();
     }
 
-    function processMatches(lines, sw, sh) {
-      const sx = canvas.width / sw, sy = canvas.height / sh;
-      let drawnY = []; // Track occupied vertical space
+    // --- REBUILT MATCH ENGINE ---
+    function updateBuffer(lines, sw, sh) {
+      const now = Date.now(), sx = canvas.width / sw, sy = canvas.height / sh;
+      const frameDishesFound = new Set(); // 1:1 Dish to Box tracker
 
       lines.forEach(line => {
         const scanText = clean(line.text);
         if (scanText.length < 5) return;
 
-        // 1. DATABASE MATCH (Bistro Jeanty, etc)
+        // 1. Restaurant-Specific Database Match
         if (currentRestaurant !== "GLOBAL") {
             Object.keys(activeMenu).forEach(dishKey => {
-                const dishTokens = dishKey.split(' ').filter(w => w.length > 3);
-                const hits = dishTokens.filter(w => scanText.includes(w)).length;
+                if (frameDishesFound.has(dishKey)) return;
+
+                const dishTokens = dishKey.split(' ').filter(w => w.length > 3 && !['with','and','plus','the','pour'].includes(w));
+                const matchCount = dishTokens.filter(w => scanText.split(' ').includes(w)).length;
                 
-                // STRICTOR MATCH: Need at least 80% word match
-                if (hits >= Math.ceil(dishTokens.length * 0.8) && dishKey.length > 4) {
-                    if (!isYOccupied(line.bbox.y0 * sy, drawnY)) {
-                        const rows = activeMenu[dishKey];
-                        // Consolidated wine list based on mode
-                        let info = [];
-                        rows.forEach(r => {
-                            if (currentMode === 'somm') info.push(r[3]);
-                            else if (currentMode === 'ai') { info.push(r[4]); info.push(r[5]); }
-                            else if (currentMode === 'expert') { info.push(r[7]); info.push(r[8]); info.push(r[9]); }
-                            else if (currentMode === 'basic') { info.push(r[10]); info.push(r[11]); info.push(r[12]); }
-                        });
-                        drawInfoBox(line.bbox, rows[0][1], info, sx, sy);
-                        drawnY.push(line.bbox.y0 * sy);
-                    }
+                // Requirement: ALL significant words must match
+                if (matchCount === dishTokens.length && dishKey.length > 4) {
+                    const row = activeMenu[dishKey][0];
+                    let opts = (currentMode === 'somm' ? [row[3]] : currentMode === 'ai' ? [row[4], row[5]] : [row[7], row[8], row[9]]);
+                    
+                    updatePersistence(dishKey, activeMenu[dishKey][0][1], opts, line.bbox, sx, sy, now);
+                    frameDishesFound.add(dishKey);
                 }
             });
         } else {
-            // 2. LOGIC MATCH (Global Rules)
+            // 2. Fallback / Global Logic Rules Match
             logicRules.slice(1).forEach(rule => {
-                const foodName = clean(rule[1]); 
-                const anchor = foodName.split(' ').sort((a,b) => b.length - a.length)[0]; 
-                if (scanText.includes(anchor) && anchor.length > 4) {
-                    if (!isYOccupied(line.bbox.y0 * sy, drawnY)) {
-                        let target = (currentMode === 'somm' ? rule[3] : currentMode === 'ai' ? rule[4] + "," + rule[5] : rule[7] + "," + rule[8]);
-                        const wines = findWineMatches(target);
-                        if (wines.length > 0) {
-                            drawInfoBox(line.bbox, rule[1], wines, sx, sy);
-                            drawnY.push(line.bbox.y0 * sy);
-                        }
+                const ruleId = clean(rule[1]);
+                if (frameDishesFound.has(ruleId)) return;
+
+                const ruleTokens = ruleId.split(' ').filter(w => w.length > 4); 
+                if (ruleTokens.length > 0 && ruleTokens.every(w => scanText.includes(w))) {
+                    let targetVar = (currentMode === 'somm' ? rule[3] : currentMode === 'ai' ? rule[4] + "," + rule[5] : rule[7] + "," + rule[8]);
+                    const foundWines = findWineMatches(targetVar);
+                    if (foundWines.length > 0) {
+                        updatePersistence(ruleId, rule[1], foundWines, line.bbox, sx, sy, now);
+                        frameDishesFound.add(ruleId);
                     }
                 }
             });
@@ -202,7 +194,21 @@
       });
     }
 
-    function isYOccupied(y, list) { return list.some(ey => Math.abs(ey - y) < 45); }
+    function updatePersistence(id, name, data, bbox, sx, sy, now) {
+        const y = bbox.y0 * sy, x = bbox.x0 * sx;
+        const existingIdx = persistentMatches.findIndex(m => m.id === id);
+        
+        if (existingIdx > -1) {
+            // Snap existing box to new detected location
+            persistentMatches[existingIdx].bbox = { x0: x, y0: y, x1: bbox.x1 * sx, y1: bbox.y1 * sy };
+            persistentMatches[existingIdx].lastSeen = now;
+        } else {
+            // Only add if this screen space isn't already occupied by another active box
+            if (!persistentMatches.some(m => Math.abs(m.bbox.y0 - y) < 45)) {
+                persistentMatches.push({ id, name, data, bbox: { x0: x, y0: y, x1: bbox.x1 * sx, y1: bbox.y1 * sy }, lastSeen: now });
+            }
+        }
+    }
 
     function findWineMatches(vStr) {
         if (!vStr || !wineListTextClean) return [];
@@ -217,27 +223,43 @@
         return res;
     }
 
-    function drawInfoBox(bbox, name, infoList, sx, sy) {
-        const x = bbox.x0 * sx, y = bbox.y0 * sy;
-        // Strip decoder metadata (Exp181, etc)
+    function renderLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+      
+      const now = Date.now();
+      persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
+
+      persistentMatches.forEach(m => {
+        const opacity = Math.min(1, (DECAY_TIME - (now - m.lastSeen)) / 1000);
+        drawInfoBox(m.bbox, m.name, m.data, opacity);
+      });
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawInfoBox(bbox, name, infoList, opacity) {
+        const fontSize = 14, lineHeight = 20, padding = 15;
         const cleanInfo = [...new Set(infoList.filter(t => t && !/^(Exp|AI_|Bas|Gen)\d+/i.test(t.trim())))];
         if (cleanInfo.length === 0) return;
 
+        ctx.globalAlpha = opacity;
         ctx.font = "bold 14px Arial";
         let maxW = ctx.measureText(name.toUpperCase()).width;
         ctx.font = "12px Arial";
         cleanInfo.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
-        const boxW = maxW + 30, totalH = (cleanInfo.length + 1) * 22 + 20;
-        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(x, y - totalH - 5, boxW, totalH, 10); ctx.fill();
-        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), x + 15, y - totalH + 28);
+        const boxW = Math.min(300, maxW + 30), totalH = (cleanInfo.length + 1) * 22 + 20;
+
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxW, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), bbox.x0 + 15, bbox.y0 - totalH + 28);
         ctx.fillStyle = "white"; ctx.font = "12px Arial";
-        cleanInfo.forEach((t, i) => ctx.fillText("• " + t, x + 15, y - totalH + 28 + (22 * (i+1))));
-        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(x, y, (bbox.x1-bbox.x0)*sx, (bbox.y1-bbox.y0)*sy);
+        cleanInfo.forEach((t, i) => ctx.fillText("• " + t, bbox.x0 + 15, bbox.y0 - totalH + 28 + (22 * (i+1))));
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1-bbox.x0, bbox.y1-bbox.y0);
+        ctx.globalAlpha = 1.0;
     }
 
     function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
     function toggleMenu(id) { const el = document.getElementById(id); const other = id === 'resMenu' ? 'modeMenu' : 'resMenu'; document.getElementById(other).style.display = 'none'; el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
-    function setMode(m, el) { currentMode = m; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); el.style.color = '#34C759'; toggleMenu('modeMenu'); }
+    function setMode(m, el) { currentMode = m; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); el.style.color = '#34C759'; toggleMenu('modeMenu'); persistentMatches = []; }
   </script>
 </body>
 </html>
