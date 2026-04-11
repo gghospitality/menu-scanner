@@ -191,3 +191,55 @@
               const scaledBbox = { x0: line.bbox.x0 * sx, y0: line.bbox.y0 * sy, x1: line.bbox.x1 * sx, y1: line.bbox.y1 * sy };
               const idx = persistentMatches.findIndex(m => m.id === key);
               if (idx > -1) { persistentMatches[idx].bbox = scaledBbox; persistentMatches[idx].lastSeen = now; persistentMatches[idx].displayData = valid; }
+              else { persistentMatches.push({ id: key, name: rows[0][1], bbox: scaledBbox, displayData: valid, lastSeen: now }); }
+            }
+          }
+        });
+      });
+    }
+
+    function renderLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+      const now = Date.now();
+      persistentMatches = persistentMatches.filter(m => now - m.lastSeen < DECAY_TIME);
+
+      persistentMatches.forEach(m => {
+        const age = now - m.lastSeen;
+        const opacity = (DECAY_TIME - age) / 1000;
+        
+        if (m.isWineLine) {
+            ctx.globalAlpha = Math.min(opacity, 0.5);
+            ctx.strokeStyle = "#34C759"; ctx.lineWidth = 4;
+            ctx.strokeRect(m.pos.x0, m.pos.y0, m.pos.x1 - m.pos.x0, m.pos.y1 - m.pos.y0);
+        } else {
+            // Automatic Text Box Overlays (as requested)
+            drawInfoBox(m.bbox, m.name, m.displayData, opacity);
+        }
+      });
+      ctx.globalAlpha = 1.0;
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawInfoBox(bbox, name, infoList, opacity) {
+        const fontSize = 14, lineHeight = 20, padding = 15;
+        ctx.font = `bold ${fontSize}px Arial`;
+        let maxW = ctx.measureText(name.toUpperCase()).width;
+        ctx.font = `${fontSize - 2}px Arial`;
+        infoList.forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
+        const boxWidth = maxW + (padding * 2), totalH = (infoList.length + 1) * lineHeight + (padding * 2);
+        
+        ctx.globalAlpha = Math.min(opacity, 1.0);
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(bbox.x0, bbox.y0 - totalH - 5, boxWidth, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = `bold ${fontSize}px Arial`; ctx.fillText(name.toUpperCase(), bbox.x0 + padding, bbox.y0 - totalH + padding + 14);
+        ctx.fillStyle = "white"; ctx.font = `${fontSize - 2}px Arial`;
+        [...new Set(infoList)].forEach((t, i) => { ctx.fillText("• " + t, bbox.x0 + padding, bbox.y0 - totalH + padding + 14 + (lineHeight * (i+1))); });
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+    }
+
+    function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
+    function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+    function setMode(m, el) { currentMode = m; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); el.style.color = '#34C759'; toggleMenu('modeMenu'); persistentMatches = []; }
+  </script>
+</body>
+</html>
