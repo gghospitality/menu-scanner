@@ -179,3 +179,35 @@
 
     function findWineMatches(vStr) {
         if (!vStr || !wineListRaw) return [];
+        const targets = vStr.split(',').map(v => clean(v.trim())).filter(v => v.length > 3);
+        const listLines = wineListRaw.split('\n');
+        let results = [];
+        for (let line of listLines) {
+            const cleanL = clean(line);
+            for (let t of targets) { if (cleanL.includes(t)) { results.push(line.trim()); break; } }
+            if (results.length >= 2) break;
+        }
+        return results;
+    }
+
+    function drawInfoBox(bbox, name, infoList, sx, sy) {
+        const x = bbox.x0 * sx, y = bbox.y0 * sy;
+        ctx.font = "bold 14px Arial";
+        let maxW = ctx.measureText(name.toUpperCase()).width;
+        ctx.font = "12px Arial";
+        infoList.filter(t => t).forEach(t => { const w = ctx.measureText("• " + t).width; if (w > maxW) maxW = w; });
+        const boxW = maxW + 30, totalH = (infoList.filter(t=>t).length + 1) * 22 + 20;
+        ctx.fillStyle = "rgba(0,0,0,0.92)"; ctx.beginPath(); ctx.roundRect(x, y - totalH - 5, boxW, totalH, 10); ctx.fill();
+        ctx.fillStyle = "#34C759"; ctx.font = "bold 14px Arial"; ctx.fillText(name.toUpperCase(), x + 15, y - totalH + 28);
+        ctx.fillStyle = "white"; ctx.font = "12px Arial";
+        [...new Set(infoList)].filter(t=>t).forEach((t, i) => ctx.fillText("• " + t, x + 15, y - totalH + 28 + (22 * (i+1))));
+        ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3; ctx.strokeRect(x, y, (bbox.x1-bbox.x0)*sx, (bbox.y1-bbox.y0)*sy);
+    }
+
+    function clean(str) { return str ? str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() : ""; }
+    function toggleMenu(id) { const el = document.getElementById(id); el.style.display = el.style.display === 'flex' ? 'none' : 'flex'; }
+    function setMode(m, el) { currentMode = m; document.querySelectorAll('#modeMenu .menu-item').forEach(i => i.style.color = '#ccc'); el.style.color = '#34C759'; toggleMenu('modeMenu'); }
+    function renderLoop() { requestAnimationFrame(renderLoop); }
+  </script>
+</body>
+</html>
