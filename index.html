@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AR Pro v5.2</title>
+  <title>Sommurai AR Pro v5.3</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
+    
+    /* SPLASH SCREEN UI */
     #splash-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: 9999; padding: 60px 0; box-sizing: border-box; }
     #splash-buttons { width: 85%; display: flex; flex-direction: column; gap: 15px; }
     .splash-btn { padding: 18px; border-radius: 15px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; color: white; background: #002d58; }
-    #splash-screen img { width: 220px; height: auto; margin-bottom: 20px; }
+    #splash-screen img { width: 220px; height: auto; margin-bottom: 20px; flex-shrink: 0; }
 
     #container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; z-index: 1; }
@@ -30,12 +32,12 @@
 </head>
 <body>
 
-  <div id="version-tag">v5.2</div>
+  <div id="version-tag">v5.3</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
     <div id="splash-buttons">
-        <button class="splash-btn" onclick="startFlow('Scan Wine List')">STEP 1: LIVE WINE INDEX</button>
+        <button class="splash-btn" onclick="startFlow('Scan Wine List')">STEP 1: SCAN WINE LIST</button>
         <button class="splash-btn" style="background:#34C759" onclick="startFlow('Scan Menu')">STEP 2: SCAN FOOD MENU</button>
         <button class="splash-btn" style="background:#444" onclick="startFlow('Menu List')">DATABASE VIEW</button>
     </div>
@@ -64,7 +66,7 @@
     let isScanning = false, persistentMatches = [], wineListBuffer = new Set(), currentRestaurant = "GLOBAL";
     const DECAY_TIME = 8000;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzHghryAYgr5yFhqBXVMmhNkax6cAqfBNb5iAAo_gnw_qlM3OEu9D-zMiWxxSaWTXB9/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxCZ13YNqiylYk8lyhXbku_vkZjKmf4whe4WyokuSdddQ0tvqG4J5jdhn5Wyj7Agdca/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -89,7 +91,7 @@
 
     async function initAI() {
       worker = await Tesseract.createWorker('eng', 1, {
-        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Thinking: ${Math.round(m.progress * 100)}%`; }
+        logger: m => { if (m.status === 'recognizing' && isScanning) status.innerText = `Parsing: ${Math.round(m.progress * 100)}%`; }
       });
       status.innerText = "Engine Ready";
     }
@@ -141,13 +143,13 @@
         if (appMode === 'Scan Wine List') {
             result.data.lines.forEach(l => {
                 const txt = clean(l.text);
-                if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot') || txt.includes('glass'))) {
+                if (txt.length > 7 && (/\d/.test(txt) || txt.includes('brut') || txt.includes('pinot'))) {
                     wineListBuffer.add(l.text);
                     ctx.strokeStyle = "#34C759"; ctx.lineWidth = 3;
                     ctx.strokeRect(l.bbox.x0*(canvas.width/640), l.bbox.y0*(canvas.height/off.height), (l.bbox.x1-l.bbox.x0)*(canvas.width/640), (l.bbox.y1-l.bbox.y0)*(canvas.height/off.height));
                 }
             });
-            status.innerText = `Indexing: ${wineListBuffer.size} drinks cached`;
+            status.innerText = `Indexing: ${wineListBuffer.size} drinks found`;
         } else {
             ctx.clearRect(0,0,canvas.width,canvas.height);
             processFoodMatches(result.data.lines, 640, off.height);
@@ -163,21 +165,8 @@
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ base64: off.toDataURL('image/jpeg', 0.5), ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: currentRestaurant }) });
       appMode = 'Scan Menu'; updateActionBtnUI();
-      status.innerText = "Wine Index Saved. Scan Menu!";
-      handleAction(); 
-    }
-
-    function isWineMatch(wineRec) {
-        if(!wineRec || !wineListText) return false;
-        const tokens = clean(wineRec).split(' ').filter(t => t.length > 4 && isNaN(t));
-        // Two-Factor check: Producer AND a Style/Cuvée word must match
-        const producer = tokens[0];
-        const cuvee = tokens[1] || "";
-        
-        if (!producer) return false;
-        if (!cuvee) return wineListText.includes(producer);
-        
-        return wineListText.includes(producer) && (wineListText.includes(cuvee) || wineListText.includes(tokens[2] || ""));
+      status.innerText = "Step 1 Complete. Ready for Menu.";
+      handleAction(); // AUTO START MENU SCAN
     }
 
     function processFoodMatches(lines, sw, sh) {
@@ -191,11 +180,12 @@
           if (allWordsMatch && key.length > 4) {
             const rows = activeMenu[key];
             let options = (currentMode === 'somm' ? [rows[0][3]] : currentMode === 'ai' ? [rows[0][4], rows[0][5]] : [rows[0][7], rows[0][8]]);
-            const valid = options.filter(w => isWineMatch(w));
-            
-            if (valid.length > 0) {
-               drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
-            }
+            const valid = options.filter(wineRec => {
+                if(!wineRec || !wineListText) return false;
+                const producer = clean(wineRec).split(' ').find(word => word.length > 4 && isNaN(word));
+                return producer && wineListText.includes(producer);
+            });
+            if (valid.length > 0) drawInfoBox(line.bbox, rows[0][1], valid, sx, sy);
           }
         });
       });
