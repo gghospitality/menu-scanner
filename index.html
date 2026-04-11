@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sommurai AI Pro</title>
+  <title>Sommurai AI Pro v4.3</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { margin: 0; background: #000; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; color: white; display: flex; flex-direction: column; }
@@ -30,6 +30,7 @@
 
     #status { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); width: 75%; background: rgba(0,0,0,0.85); color: #34C759; padding: 12px; border-radius: 25px; text-align: center; font-size: 12px; z-index: 1000; border: 1px solid #34C759; font-weight: bold; }
     #startOverBtn { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; z-index: 5000; display: none; font-weight: bold; }
+    #version-tag { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #444; }
 
     /* CONTROLS */
     #controls { min-height: 180px; background: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 100px; border-top: 1px solid #333; z-index: 1000; }
@@ -41,6 +42,7 @@
 </head>
 <body>
 
+  <div id="version-tag">v4.3</div>
   <button id="startOverBtn" onclick="location.reload()">↺ START OVER</button>
 
   <div id="splash-screen">
@@ -74,7 +76,8 @@
     let isScanning = false, persistentMatches = [], wineListBuffer = new Set();
     const DECAY_TIME = 5000;
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxoPVBBxb84wFeQ5csSXH-SNQnrNZ2KmOzRZbEY4zquYvGbsHgeV183q8lgZmK8dOlR/exec";
+    // !!! PASTE YOUR LATEST GAS URL BELOW !!!
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzGi8cJXSwsxuSO2HzWgWulmWC5OKPi4zs7clyG_Qc6oRzsP5bKyv7iECnEMgL48eOS/exec";
 
     async function startFlow(mode) {
       appMode = mode;
@@ -97,7 +100,7 @@
         return new Promise((resolve) => {
           video.onloadedmetadata = () => { video.play().then(() => resolve(true)).catch(() => resolve(true)); };
         });
-      } catch (e) { alert("Camera Error"); return false; }
+      } catch (e) { alert("Camera Access Error"); return false; }
     }
 
     async function initAI() {
@@ -187,34 +190,25 @@
     }
 
     function finalizeWineScan() {
-      // 1. Locally store memory for instant pairing
       lastScannedWineText = clean(Array.from(wineListBuffer).join(' '));
-      
-      // 2. Prepare high-res frame for Drive
       const off = document.createElement('canvas'); off.width = 1200; off.height = video.videoHeight * (1200 / video.videoWidth);
       off.getContext('2d').drawImage(video, 0, 0, off.width, off.height);
       const base64 = off.toDataURL('image/jpeg', 0.5);
       
-      // 3. BACKGROUND UPLOAD (Async)
+      // BACKGROUND UPLOAD
       fetch(GAS_URL, { 
           method: "POST", 
-          body: JSON.stringify({ 
-              base64: base64, 
-              ocr: Array.from(wineListBuffer).join('\n'), 
-              type: 'Scan Wine List', 
-              restaurant: activeMenu['currentRestaurant'] || "GLOBAL" 
-          }) 
+          body: JSON.stringify({ base64: base64, ocr: Array.from(wineListBuffer).join('\n'), type: 'Scan Wine List', restaurant: activeMenu['currentRestaurant'] || "GLOBAL" }) 
       }).catch(e => console.log("Bg upload silent"));
 
-      // 4. Transform UI
       isScanning = false;
       appMode = 'Scan Menu';
       updateActionButton();
       persistentMatches = [];
       wineListBuffer.clear();
-      status.innerText = "Wine List Indexed. Scan Menu!";
+      status.innerText = "Wine List Stored. Scan Menu!";
       
-      // 5. AUTO START FOOD SCAN
+      // AUTO TRIGGER NEXT STEP
       handleAction(); 
     }
 
@@ -228,10 +222,7 @@
             const rows = activeMenu[foodKey];
             rows.forEach(row => {
               let wines = (currentMode === "somm") ? [row[3]] : (currentMode === "ai") ? [row[4], row[5]] : (currentMode === "expert") ? [row[7], row[8], row[9]] : [row[10], row[11], row[12]];
-              
-              // Only suggest wines that were in the Wine List Scan
               const valid = wines.filter(w => isWineMatch(w));
-              
               if (valid.length > 0) {
                 const scaledBbox = { x0: line.bbox.x0 * scaleX, y0: line.bbox.y0 * scaleY, x1: line.bbox.x1 * scaleX, y1: line.bbox.y1 * scaleY };
                 const idx = persistentMatches.findIndex(m => m.itemName === foodKey);
